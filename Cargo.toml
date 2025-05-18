@@ -1,0 +1,9 @@
+[package]
+name = "sir"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+async-openai = "0.28.1"
+dotenv = "0.15.0"
+tokio = { version = "1.45.0", features = ["macros", "rt", "rt-multi-thread", "tokio-macros"] }
