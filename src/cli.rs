@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 
-use crate::llm::LLM;
+use crate::LLM;
 
 pub async fn cli(llm: &mut LLM) -> Result<(), ()>{
     loop {
@@ -16,7 +16,7 @@ pub async fn cli(llm: &mut LLM) -> Result<(), ()>{
                     return Ok(());
                 }
                 let result = llm.ask(trimmed).await;
-                if let Ok(Some(message)) = result {
+                if let Ok(message) = result {
                     println!("{}", message);
                 }
             }
