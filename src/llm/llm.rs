@@ -1,12 +1,9 @@
-use std::{fs::read_to_string, sync::Arc};
+use std::{fs::read_to_string, pin::Pin, sync::Arc};
 
 use async_openai::{
     config::OpenAIConfig,
     types::{
-        ChatCompletionRequestAssistantMessage, ChatCompletionRequestAssistantMessageContent,
-        ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage,
-        ChatCompletionRequestSystemMessageContent, ChatCompletionRequestUserMessage,
-        ChatCompletionRequestUserMessageContent, CreateChatCompletionRequest,
+        ChatCompletionRequestAssistantMessage, ChatCompletionRequestAssistantMessageContent, ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage, ChatCompletionRequestSystemMessageContent, ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageContent, ChatCompletionResponseStream, CreateChatCompletionRequest
     },
     Client,
 };
@@ -100,7 +97,7 @@ impl LLM {
         .await
     }
 
-    pub async fn ask(&mut self, prompt: &str) -> Result<String, ()> {
+    pub async fn get_full_response(&mut self, prompt: &str) -> Result<String, ()> {
         self.history_repo
             .add(&ChatCompletionRequestMessage::User(
                 ChatCompletionRequestUserMessage {
@@ -140,5 +137,27 @@ impl LLM {
             return Err(());
         }
         unreachable!();
+    }
+
+    pub async fn get_response_stream(&mut self, prompt: &str) -> Result<ChatCompletionResponseStream, ()> {
+        self.history_repo
+            .add(&ChatCompletionRequestMessage::User(
+                ChatCompletionRequestUserMessage {
+                    content: ChatCompletionRequestUserMessageContent::Text(prompt.to_owned()),
+                    name: None,
+                },
+            ))
+            .await
+            .map_err(|_| ())?;
+        let history = self.history_repo.history().await.map_err(|_| ())?;
+
+        let request = CreateChatCompletionRequest {
+            model: self.model.clone(),
+            messages: history,
+            stream: Some(true),
+            ..Default::default()
+        };
+
+        Ok(self.client.chat().create_stream(request).await.map_err(|_| ())?)
     }
 }

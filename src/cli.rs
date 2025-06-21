@@ -1,8 +1,11 @@
 use std::io::{self, Write};
+use tokio_stream::StreamExt;
+
+use async_openai::types::ChatCompletionResponseStream;
 
 use crate::LLM;
 
-pub async fn cli(llm: &mut LLM) -> Result<(), ()>{
+pub async fn cli(llm: &mut LLM) -> Result<(), ()> {
     loop {
         print!(">>> ");
         io::stdout().flush().unwrap();
@@ -15,9 +18,8 @@ pub async fn cli(llm: &mut LLM) -> Result<(), ()>{
                 if trimmed.eq_ignore_ascii_case("exit") {
                     return Ok(());
                 }
-                let result = llm.ask(trimmed).await;
-                if let Ok(message) = result {
-                    println!("{}", message);
+                if let Ok(mut stream) = llm.get_response_stream(trimmed).await {
+                    print_stream(&mut stream).await;
                 }
             }
             Err(error) => {
@@ -25,4 +27,13 @@ pub async fn cli(llm: &mut LLM) -> Result<(), ()>{
             }
         }
     }
+}
+
+async fn print_stream(stream: &mut ChatCompletionResponseStream) {
+    while let Some(Ok(response)) = stream.next().await {
+        if let Some(text) = &response.choices[0].delta.content {
+            print!("{}", text);
+        }
+    }
+    println!();
 }
