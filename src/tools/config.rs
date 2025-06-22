@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct McpConfig {
-    pub servers: Vec<McpServerConfig>,
+    pub servers: HashMap<String, McpServerConfig>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

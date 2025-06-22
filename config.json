@@ -1,6 +1,12 @@
 {
 	"mcp": {
-		"servers": [
-		]
+		"servers": {
+			"calculator": {
+				"command": "uvx",
+				"args": [
+					"mcp-server-calculator"
+				]
+			}
+		}
 	}
 }

@@ -8,9 +8,10 @@ pub struct Config {
 }
 
 impl Config {
-    pub async fn load(path: &str) -> Result<Self, ()> {
-        let content = tokio::fs::read_to_string(path).await.unwrap();
-        let config: Self = serde_json::from_str(&content).unwrap();
-        Ok(config)
+    pub async fn load(path: &str) -> Self {
+        let content = tokio::fs::read_to_string(path)
+            .await
+            .expect("Can't open a config file");
+        serde_json::from_str(&content).expect("Can't parse a config file")
     }
 }
