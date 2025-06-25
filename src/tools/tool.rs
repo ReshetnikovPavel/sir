@@ -1,4 +1,4 @@
-use async_openai::types::{ChatCompletionMessageToolCall, ChatCompletionTool, FunctionObject};
+use async_openai::types::{ChatCompletionMessageToolCall, ChatCompletionTool, FunctionCall, FunctionObject};
 use rmcp::{self, model::CallToolRequestParam};
 use serde_json::Value;
 
@@ -47,5 +47,16 @@ impl From<ToolCall> for CallToolRequestParam  {
             name: tool_call.name.into(),
             arguments: tool_call.arguments.into(),
         }
+    }
+}
+
+impl TryFrom<ChatCompletionMessageToolCall> for ToolCall {
+    type Error = serde_json::Error;
+
+    fn try_from(tool_call: ChatCompletionMessageToolCall) -> Result<Self, Self::Error> {
+        Ok(Self {
+            name: tool_call.function.name,
+            arguments: serde_json::from_str(&tool_call.function.arguments)?,
+        })
     }
 }

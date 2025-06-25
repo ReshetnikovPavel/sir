@@ -1,23 +1,27 @@
+use rmcp::model::CallToolResult;
 use std::sync::Arc;
 use tokio_stream::StreamExt;
 
 use async_openai::{
     config::OpenAIConfig,
     types::{
-        ChatCompletionRequestAssistantMessage, ChatCompletionRequestAssistantMessageContent,
-        ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage,
-        ChatCompletionRequestSystemMessageContent, ChatCompletionRequestUserMessage,
-        ChatCompletionRequestUserMessageContent, ChatCompletionTool, CreateChatCompletionRequest,
+        ChatCompletionMessageToolCall, ChatCompletionRequestAssistantMessage,
+        ChatCompletionRequestAssistantMessageContent, ChatCompletionRequestMessage,
+        ChatCompletionRequestMessageContentPartText, ChatCompletionRequestSystemMessage,
+        ChatCompletionRequestSystemMessageContent, ChatCompletionRequestToolMessage,
+        ChatCompletionRequestToolMessageContent, ChatCompletionRequestToolMessageContentPart,
+        ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageContent,
+        ChatCompletionTool, CreateChatCompletionRequest,
     },
     Client,
 };
 
 use crate::{
     history::{self, history_repo::HistoryRepo},
-    tools::{tool::ToolCall, tool_stream_collector::ToolStreamCollector, tools_repo::ToolsRepo},
+    tools::{tool_stream_collector::ToolStreamCollector, tools_repo::ToolsRepo},
 };
 
-use super::displayer::ChunkDisplayer;
+use super::displayer::Displayer;
 
 pub struct Pipeline {
     client: Client<OpenAIConfig>,
@@ -56,7 +60,7 @@ impl Pipeline {
     pub async fn call(
         &mut self,
         prompt: &str,
-        chunk_displayer: Arc<dyn ChunkDisplayer>,
+        displayer: Arc<dyn Displayer>,
     ) -> Result<(), ()> {
         self.history_repo.add(&user_message(prompt)).await.unwrap();
 
@@ -82,31 +86,37 @@ impl Pipeline {
         let mut stream = self.client.chat().create_stream(request).await.unwrap();
 
         let mut tool_stream_collector = ToolStreamCollector::new();
-        let mut history_collector = vec![];
+        let mut content = String::new();
+        let mut tool_call_messages = vec![];
+        let mut tool_call_result_messages = vec![];
         while let Some(Ok(response)) = stream.next().await {
             let choice = &response.choices[0];
             // println!("{:?}", choice);
             if let Some(chunk) = &choice.delta.content {
-                history_collector.push(chunk.clone());
+                content.push_str(&chunk);
             }
 
-            chunk_displayer.display_chunk(choice).await;
+            displayer.display_chunk(choice).await;
 
-            let call = tool_stream_collector.add_data(choice).unwrap();
-            if let Some(call) = call {
+            let call_message = tool_stream_collector.add_data(choice);
+            if let Some(call_message) = call_message {
+                tool_call_messages.push(call_message.clone());
+                let call = call_message.clone().try_into().unwrap();
                 let call_tool_result = self.tools_repo.call_tool(call).await.unwrap();
-                println!("{:?}", call_tool_result);
-                for content in call_tool_result.content {
-                    if let Some(text_content) = content.as_text() {
-                        println!("Результат: `{}`", text_content.text);
-                    }
-                }
+                displayer.display_tool_call_result(&call_tool_result).await;
+                tool_call_result_messages.push(call_tool_result_message(
+                    &call_message.id,
+                    &call_tool_result,
+                ));
             }
         }
         self.history_repo
-            .add(&assistant_message(&history_collector.join("")))
+            .add(&assistant_message(content, tool_call_messages))
             .await
             .unwrap();
+        for tool_call_result in tool_call_result_messages {
+            self.history_repo.add(&tool_call_result).await.unwrap();
+        }
         Ok(())
     }
 }
@@ -118,15 +128,39 @@ fn user_message(prompt: &str) -> ChatCompletionRequestMessage {
     })
 }
 
-fn assistant_message(content: &str) -> ChatCompletionRequestMessage {
+fn assistant_message(
+    content: String,
+    tool_calls: Vec<ChatCompletionMessageToolCall>,
+) -> ChatCompletionRequestMessage {
     ChatCompletionRequestMessage::Assistant(ChatCompletionRequestAssistantMessage {
-        content: Some(ChatCompletionRequestAssistantMessageContent::Text(
-            content.to_owned(),
-        )),
+        content: Some(ChatCompletionRequestAssistantMessageContent::Text(content)),
         refusal: None,
         name: None,
         audio: None,
-        tool_calls: None,
+        tool_calls: if tool_calls.is_empty() {
+            None
+        } else {
+            Some(tool_calls)
+        },
         function_call: None,
+    })
+}
+
+fn call_tool_result_message(id: &str, result: &CallToolResult) -> ChatCompletionRequestMessage {
+    ChatCompletionRequestMessage::Tool(ChatCompletionRequestToolMessage {
+        content: ChatCompletionRequestToolMessageContent::Array(
+            result
+                .content
+                .iter()
+                .map(|c| {
+                    ChatCompletionRequestToolMessageContentPart::Text(
+                        ChatCompletionRequestMessageContentPartText {
+                            text: c.as_text().map(|c| c.text.clone()).unwrap_or("".to_owned()),
+                        },
+                    )
+                })
+                .collect(),
+        ),
+        tool_call_id: id.to_owned(),
     })
 }
