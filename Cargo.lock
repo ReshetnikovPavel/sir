@@ -2168,10 +2168,12 @@ dependencies = [
  "client",
  "dotenv",
  "env_logger",
+ "futures",
  "log",
  "rmcp",
  "serde",
  "serde_json",
+ "thiserror 2.0.12",
  "tokio",
  "tokio-stream",
 ]

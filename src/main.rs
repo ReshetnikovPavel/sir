@@ -5,6 +5,7 @@ use cli::runtime::cli_runtime;
 use config::Config;
 use dotenv::dotenv;
 use history::file_history_repo::FileHistoryRepo;
+use log::warn;
 use tools::tools_repo::ToolsRepo;
 
 mod chat;
@@ -19,7 +20,14 @@ async fn main() {
     env_logger::init();
     let config = Config::load("config.json").await;
 
-    let tools_repo = Arc::new(ToolsRepo::from_config(&config.mcp).await.expect("Can't create tools repo"));
+    let tools_repo = match ToolsRepo::from_config(&config.mcp).await {
+        Ok(r) => r,
+        Err((r, e)) => {
+            warn!("Unable to load MCP servers: {:?}", e);
+            r
+        }
+    };
+    let tools_repo = Arc::new(tools_repo);
     let history_repo = Arc::new(FileHistoryRepo {
         file_path: "history.json".to_string(),
     });
@@ -39,7 +47,9 @@ async fn main() {
         &system_prompt,
         history_repo,
         tools_repo,
-        ).await.expect("Cannot create a chat pipeline");
+    )
+    .await
+    .expect("Cannot create a chat pipeline");
 
     cli_runtime(&mut pipeline).await;
 }

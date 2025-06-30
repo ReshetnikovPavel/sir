@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -25,5 +25,6 @@ pub enum McpServerTransportConfig {
         args: Vec<String>,
         #[serde(default)]
         envs: HashMap<String, String>,
+        log: Option<PathBuf>,
     },
 }

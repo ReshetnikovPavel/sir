@@ -1,4 +1,4 @@
-use async_openai::types::{ChatCompletionMessageToolCall, ChatCompletionTool, FunctionCall, FunctionObject};
+use async_openai::types::{ChatCompletionMessageToolCall, ChatCompletionTool, FunctionObject};
 use rmcp::{self, model::CallToolRequestParam};
 use serde_json::Value;
 

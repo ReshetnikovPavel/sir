@@ -1,11 +1,6 @@
 use async_openai::types::{
-    ChatChoiceStream, ChatCompletionMessageToolCall, ChatCompletionMessageToolCallChunk,
-    FinishReason, FunctionCall,
+    ChatChoiceStream, ChatCompletionMessageToolCall, FinishReason, FunctionCall,
 };
-
-use crate::tools::tool::JsonObject;
-
-use super::tool::ToolCall;
 
 pub struct ToolStreamCollector {
     id: String,
