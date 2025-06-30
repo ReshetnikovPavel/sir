@@ -1,18 +1,9 @@
-use rmcp::model::CallToolResult;
 use std::sync::Arc;
 use tokio_stream::StreamExt;
 
 use async_openai::{
     config::OpenAIConfig,
-    types::{
-        ChatCompletionMessageToolCall, ChatCompletionRequestAssistantMessage,
-        ChatCompletionRequestAssistantMessageContent, ChatCompletionRequestMessage,
-        ChatCompletionRequestMessageContentPartText, ChatCompletionRequestSystemMessage,
-        ChatCompletionRequestSystemMessageContent, ChatCompletionRequestToolMessage,
-        ChatCompletionRequestToolMessageContent, ChatCompletionRequestToolMessageContentPart,
-        ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageContent,
-        ChatCompletionTool, CreateChatCompletionRequest,
-    },
+    types::{ChatCompletionTool, CreateChatCompletionRequest},
     Client,
 };
 
@@ -21,7 +12,7 @@ use crate::{
     tools::{tool_stream_collector::ToolStreamCollector, tools_repo::ToolsRepo},
 };
 
-use super::displayer::Displayer;
+use super::{displayer::Displayer, messages};
 
 pub struct Pipeline {
     client: Client<OpenAIConfig>,
@@ -43,10 +34,7 @@ impl Pipeline {
             .with_api_base(api_base)
             .with_api_key(api_key);
         let client = Client::with_config(config);
-        let system_message = ChatCompletionRequestSystemMessage {
-            content: ChatCompletionRequestSystemMessageContent::Text(system_prompt.to_owned()),
-            name: None,
-        };
+        let system_message = messages::system(system_prompt);
         history_repo.set_system_message(system_message).await?;
 
         Ok(Self {
@@ -58,7 +46,10 @@ impl Pipeline {
     }
 
     pub async fn call(&mut self, prompt: &str, displayer: Arc<dyn Displayer>) -> Result<(), ()> {
-        self.history_repo.add(&user_message(prompt)).await.unwrap();
+        self.history_repo
+            .add(&messages::user(prompt))
+            .await
+            .unwrap();
 
         let tools = self
             .tools_repo
@@ -101,14 +92,14 @@ impl Pipeline {
                     let call = call_message.clone().try_into().unwrap();
                     let call_tool_result = self.tools_repo.call_tool(call).await.unwrap();
                     displayer.display_tool_call_result(&call_tool_result).await;
-                    tool_call_result_messages.push(call_tool_result_message(
+                    tool_call_result_messages.push(messages::call_tool_result(
                         &call_message.id,
                         &call_tool_result,
                     ));
                 }
             }
             self.history_repo
-                .add(&assistant_message(content, tool_call_messages))
+                .add(&messages::assistant(content, tool_call_messages))
                 .await
                 .unwrap();
 
@@ -122,48 +113,4 @@ impl Pipeline {
         }
         Ok(())
     }
-}
-
-fn user_message(prompt: &str) -> ChatCompletionRequestMessage {
-    ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
-        content: ChatCompletionRequestUserMessageContent::Text(prompt.to_owned()),
-        name: None,
-    })
-}
-
-fn assistant_message(
-    content: String,
-    tool_calls: Vec<ChatCompletionMessageToolCall>,
-) -> ChatCompletionRequestMessage {
-    ChatCompletionRequestMessage::Assistant(ChatCompletionRequestAssistantMessage {
-        content: Some(ChatCompletionRequestAssistantMessageContent::Text(content)),
-        refusal: None,
-        name: None,
-        audio: None,
-        tool_calls: if tool_calls.is_empty() {
-            None
-        } else {
-            Some(tool_calls)
-        },
-        function_call: None,
-    })
-}
-
-fn call_tool_result_message(id: &str, result: &CallToolResult) -> ChatCompletionRequestMessage {
-    ChatCompletionRequestMessage::Tool(ChatCompletionRequestToolMessage {
-        content: ChatCompletionRequestToolMessageContent::Array(
-            result
-                .content
-                .iter()
-                .map(|c| {
-                    ChatCompletionRequestToolMessageContentPart::Text(
-                        ChatCompletionRequestMessageContentPartText {
-                            text: c.as_text().map(|c| c.text.clone()).unwrap_or("".to_owned()),
-                        },
-                    )
-                })
-                .collect(),
-        ),
-        tool_call_id: id.to_owned(),
-    })
 }
