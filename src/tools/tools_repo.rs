@@ -34,6 +34,7 @@ impl ToolsRepo {
                 .collect::<Vec<Tool>>();
             tools.append(&mut server_tools);
         }
+        // println!("{:?}", tools);
         Ok(tools)
     }
 
