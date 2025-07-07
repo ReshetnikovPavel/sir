@@ -1,14 +1,14 @@
-use std::sync::Arc;
+use std::{io, sync::Arc};
 use tokio_stream::StreamExt;
 
 use async_openai::{
     config::OpenAIConfig,
-    types::{ChatCompletionTool, CreateChatCompletionRequest},
+    types::{ChatCompletionTool, ChatCompletionToolChoiceOption, CreateChatCompletionRequest},
     Client,
 };
 
 use crate::{
-    history::{self, history_repo::HistoryRepo},
+    history::history_repo::HistoryRepo,
     tools::{tool_stream_collector::ToolStreamCollector, tools_repo::ToolsRepo},
 };
 
@@ -29,7 +29,7 @@ impl Pipeline {
         system_prompt: &str,
         history_repo: Arc<dyn HistoryRepo>,
         tools_repo: Arc<ToolsRepo>,
-    ) -> Result<Self, history::error::Error> {
+    ) -> Result<Self, io::Error> {
         let config = OpenAIConfig::new()
             .with_api_base(api_base)
             .with_api_key(api_key);
@@ -68,6 +68,7 @@ impl Pipeline {
                 messages: history,
                 stream: Some(true),
                 tools: Some(tools.clone()),
+                tool_choice: Some(ChatCompletionToolChoiceOption::Auto),
                 ..Default::default()
             };
 

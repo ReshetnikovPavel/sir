@@ -1,15 +1,12 @@
 use std::{
     fs::{read_to_string, OpenOptions},
-    io::Write,
+    io::{self, Write},
 };
 
 use async_openai::types::{ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage};
 use async_trait::async_trait;
 
-use super::{
-    error::{log_map, Error},
-    history_repo::HistoryRepo,
-};
+use super::history_repo::HistoryRepo;
 
 pub struct FileHistoryRepo {
     pub file_path: String,
@@ -17,21 +14,19 @@ pub struct FileHistoryRepo {
 
 #[async_trait]
 impl HistoryRepo for FileHistoryRepo {
-    async fn add(&self, message: &ChatCompletionRequestMessage) -> Result<(), Error> {
-        let json = serde_json::to_string(message).map_err(log_map)?;
+    async fn add(&self, message: &ChatCompletionRequestMessage) -> Result<(), io::Error> {
+        let json = serde_json::to_string(message)?;
         let mut file = OpenOptions::new()
             .write(true)
             .append(true)
-            .open(&self.file_path)
-            .map_err(log_map)?;
+            .open(&self.file_path)?;
 
-        writeln!(file, "{}", json).map_err(log_map)?;
+        writeln!(file, "{}", json)?;
         Ok(())
     }
 
-    async fn history(&self) -> Result<Vec<ChatCompletionRequestMessage>, Error> {
-        Ok(read_to_string(&self.file_path)
-            .map_err(log_map)?
+    async fn history(&self) -> Result<Vec<ChatCompletionRequestMessage>, io::Error> {
+        Ok(read_to_string(&self.file_path)?
             .lines()
             .filter_map(|line| serde_json::from_str(line).ok())
             .collect())
@@ -40,10 +35,10 @@ impl HistoryRepo for FileHistoryRepo {
     async fn set_system_message(
         &self,
         message: ChatCompletionRequestSystemMessage,
-    ) -> Result<(), Error> {
+    ) -> Result<(), io::Error> {
         let message = ChatCompletionRequestMessage::System(message);
-        let json = serde_json::to_string(&message).map_err(log_map)?;
-        let contents = read_to_string(&self.file_path).map_err(log_map)?;
+        let json = serde_json::to_string(&message)?;
+        let contents = read_to_string(&self.file_path)?;
         let mut lines: Vec<&str> = contents.lines().collect();
         if !lines.is_empty() {
             lines[0] = &json;
@@ -56,9 +51,8 @@ impl HistoryRepo for FileHistoryRepo {
         let mut file = OpenOptions::new()
             .write(true)
             .truncate(true)
-            .open(&self.file_path)
-            .map_err(log_map)?;
-        file.write_all(new_contents.as_bytes()).map_err(log_map)?;
+            .open(&self.file_path)?;
+        file.write_all(new_contents.as_bytes())?;
 
         Ok(())
     }
