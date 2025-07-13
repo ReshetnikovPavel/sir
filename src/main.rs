@@ -1,5 +1,6 @@
 use std::{fs::read_to_string, sync::Arc};
 
+use async_openai::{config::OpenAIConfig, Client};
 use chat::pipeline::Pipeline;
 use cli::runtime::cli_runtime;
 use config::Config;
@@ -8,6 +9,9 @@ use history::file_history_repo::FileHistoryRepo;
 use log::warn;
 use tools::tools_repo::ToolsRepo;
 
+use crate::audio::openai_stt::OpenAISpeechToText;
+
+mod audio;
 mod chat;
 mod cli;
 mod config;
@@ -32,6 +36,12 @@ async fn main() {
         file_path: "history.json".to_string(),
     });
 
+    let stt = OpenAISpeechToText {
+        client: Client::with_config(OpenAIConfig::new().with_api_base("http://127.0.0.1:8000/v1")),
+        model: "whisper-tiny-ru-ct2".to_owned(),
+    };
+    let stt = Arc::new(stt);
+
     let api_base = std::env::var("OPENAI_API_BASE").expect("OPENAI_API_BASE must be set");
     let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set");
     let model = std::env::var("OPENAI_MODEL").expect("OPENAI_MODEL must be set");
@@ -51,5 +61,5 @@ async fn main() {
     .await
     .expect("Cannot create a chat pipeline");
 
-    cli_runtime(&mut pipeline).await;
+    cli_runtime(&mut pipeline, stt.clone()).await;
 }
