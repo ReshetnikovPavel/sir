@@ -48,11 +48,13 @@ impl TextPipeline {
     pub async fn process(&self, prompt: &str, displayer: Arc<dyn Displayer>) -> anyhow::Result<()> {
         self.history_repo.add(&messages::user(prompt)).await?;
 
-        let tools = self
-            .tools_repo
-            .tools()
-            .await
-            .unwrap()
+        let tools_with_errors = self.tools_repo.tools().await;
+        for error in tools_with_errors.errors {
+            log::error!("{}", error)
+        }
+
+        let tools = tools_with_errors
+            .value
             .iter()
             .map(|t| t.clone().into())
             .collect::<Vec<ChatCompletionTool>>();

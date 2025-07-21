@@ -10,7 +10,7 @@ use tools::tools_repo::ToolsRepo;
 
 use crate::{
     audio::{audio_service::AudioService, openai_stt::OpenAISpeechToText},
-    cli::runtime::CliRuntime,
+    cli::runtime::CliRuntime, tools::tools_repo,
 };
 
 mod audio;
@@ -26,13 +26,11 @@ async fn main() {
     env_logger::init();
     let config = Config::load("config.json").await;
 
-    let tools_repo = match ToolsRepo::from_config(&config.mcp).await {
-        Ok(r) => r,
-        Err((r, e)) => {
-            warn!("Unable to load MCP servers: {:?}", e);
-            r
-        }
-    };
+    let tools_repo_with_errors = ToolsRepo::from_config(&config.mcp).await;
+    for error in tools_repo_with_errors.errors {
+        log::error!("{}", error)
+    }
+    let tools_repo = tools_repo_with_errors.value;
     let tools_repo = Arc::new(tools_repo);
     let history_repo = Arc::new(FileHistoryRepo {
         file_path: "history.json".to_string(),

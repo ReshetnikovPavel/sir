@@ -17,8 +17,13 @@ pub struct ToolsRepo {
     servers: HashMap<String, McpServer>,
 }
 
+pub struct WithErrors<T, E> {
+    pub value: T,
+    pub errors: Vec<E>,
+}
+
 impl ToolsRepo {
-    pub async fn from_config(config: &McpConfig) -> Result<Self, (Self, Vec<mcp_server::Error>)> {
+    pub async fn from_config(config: &McpConfig) -> WithErrors<Self, mcp_server::Error> {
         let tasks = config.servers.iter().map(|(name, server_config)| {
             let transport_config = server_config.transport.clone();
             let name = name.to_string();
@@ -34,22 +39,16 @@ impl ToolsRepo {
         let repo = Self {
             servers: servers.into_iter().filter_map(Result::ok).collect(),
         };
-
-        if errors.is_empty() {
-            Ok(repo)
-        } else {
-            let errors = errors.into_iter().filter_map(Result::err).collect();
-            Err((repo, errors))
+        let errors = errors.into_iter().filter_map(Result::err).collect();
+        WithErrors {
+            value: repo,
+            errors,
         }
     }
 
-    pub async fn tools(&self) -> Result<Vec<Tool>, (Vec<Tool>, Vec<ServiceError>)> {
+    pub async fn tools(&self) -> WithErrors<Vec<Tool>, ServiceError> {
         let tasks = self.servers.iter().map(|(_, server)| async {
-            Ok(server
-                .list_all_tools()
-                .await?
-                .into_iter()
-                .map(|t| t.into()))
+            Ok(server.list_all_tools().await?.into_iter().map(|t| t.into()))
         });
         let results = futures::future::join_all(tasks).await;
         let (tools, errors): (Vec<_>, Vec<_>) =
@@ -61,11 +60,10 @@ impl ToolsRepo {
             .flatten()
             .collect::<Vec<_>>();
 
-        if errors.is_empty() {
-            Ok(tools)
-        } else {
-            let errors = errors.into_iter().filter_map(Result::err).collect();
-            Err((tools, errors))
+        let errors = errors.into_iter().filter_map(Result::err).collect();
+        WithErrors {
+            value: tools,
+            errors,
         }
     }
 
