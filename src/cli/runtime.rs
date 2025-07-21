@@ -1,66 +1,72 @@
 use std::{
-    io::{self, Read, Write},
+    io::{self, Write},
     sync::Arc,
 };
 
-use crate::{
-    audio::{openai_stt::OpenAISpeechToText, recording::Recording},
-    chat::pipeline::Pipeline,
-};
+use crate::{audio::audio_service::AudioService, chat::pipeline::TextPipeline};
 
 use super::displayer::CliChunkDisplayer;
 
-pub async fn cli_runtime(pipeline: &mut Pipeline, stt: Arc<OpenAISpeechToText>) {
-    let chunk_displayer = Arc::new(CliChunkDisplayer::new());
-
-    loop {
-        print!(">>> ");
-        io::stdout().flush().unwrap();
-
-        let mut input = String::new();
-
-        match io::stdin().read_line(&mut input) {
-            Ok(_) => {
-                let trimmed = input.trim();
-                let s = match trimmed {
-                    "!voice" => &listen_voice(stt.clone()).await.unwrap(),
-                    _ => trimmed,
-                };
-                if s.eq_ignore_ascii_case("exit") {
-                    return;
-                }
-                pipeline
-                    .call(s, chunk_displayer.clone())
-                    .await
-                    .unwrap();
-            }
-            Err(error) => {
-                eprintln!("❌ Error reading input: {}", error);
-            }
-        }
-    }
+pub struct CliRuntime {
+    pub text_pipeline: Arc<TextPipeline>,
+    pub audio_service: Arc<AudioService>,
 }
 
-async fn listen_voice(client: Arc<OpenAISpeechToText>) -> anyhow::Result<String> {
-    println!("Recording voice...");
-    let recording = Recording::start()?;
+impl CliRuntime {
+    pub async fn run(&self) {
+        let chunk_displayer = Arc::new(CliChunkDisplayer::new());
 
-    loop {
-        let mut input = String::new();
-        let _ = io::stdin().read_line(&mut input)?;
-        if input.trim() == "!stop" {
-            break;
+        loop {
+            let input = match self.read_input() {
+                Ok(input) => input,
+                Err(err) => {
+                    println!("Error reading input");
+                    log::error!("{}", err);
+                    continue;
+                }
+            };
+
+            let input = input.trim();
+
+            let input = match self.use_commands(input).await {
+                Some(input) => input,
+                None => continue,
+            };
+
+            let result = self.text_pipeline
+                .process(&input, chunk_displayer.clone())
+                .await;
+
+            if let Err(err) = result {
+                println!("Something went wrong while processing your request");
+                log::error!("{}", err)
+            }
         }
     }
-    let mut file = recording.stop()?;
-    println!("Stopped recording");
 
-    let mut buf = vec![];
-    let _ = file.read_to_end(&mut buf)?;
+    fn read_input(&self) -> io::Result<String> {
+        print!(">>> ");
+        io::stdout().flush()?;
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        Ok(input)
+    }
 
-    println!("Starting transcribing...");
-    let transcription = client.transcribe(buf).await?;
-    println!("Trascribed::: {}", transcription);
+    async fn use_commands(&self, input: &str) -> Option<String> {
+        match input {
+            "!voice" | "!v" => self.voice_command().await,
+            _ => Some(input.to_owned()),
+        }
+    }
 
-    return Ok(transcription);
+    async fn voice_command(&self) -> Option<String> {
+        match self.audio_service.listen_input().await {
+            Ok(text) => Some(text),
+            Err(err) => {
+                println!("Unable to listen");
+                log::error!("{}", err);
+                None
+            }
+        }
+    }
 }

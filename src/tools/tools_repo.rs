@@ -69,7 +69,7 @@ impl ToolsRepo {
         }
     }
 
-    pub async fn call_tool(&self, tool_call: ToolCall) -> Result<CallToolResult, ServiceError> {
+    pub async fn call_tool(&self, tool_call: &ToolCall) -> Result<CallToolResult, ServiceError> {
         let tasks = self.servers.iter().map(|(_, server)| {
             let tool_call = tool_call.clone();
             async {

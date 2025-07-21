@@ -1,16 +1,17 @@
 use std::{
     fs::File,
-    io::BufWriter,
+    io::{self, BufWriter},
     sync::{Arc, Mutex},
 };
 
-use anyhow::Context;
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
-    FromSample, Sample, Stream,
+    BuildStreamError, DefaultStreamConfigError, FromSample, PlayStreamError, Sample, Stream,
+    SupportedStreamConfig,
 };
 use log::error;
 use tempfile::NamedTempFile;
+use thiserror::Error;
 
 pub struct Recording {
     writer: WavWriterHandle,
@@ -19,15 +20,23 @@ pub struct Recording {
 }
 
 impl Recording {
-    pub fn start() -> anyhow::Result<Self> {
+    pub fn start(is_vad: bool) -> Result<Self, StartRecordingError> {
         let file = NamedTempFile::new()?;
         let host = cpal::default_host();
         let device = host
             .default_input_device()
-            .context("Cannot get default audio input device")?;
-        let config = device.default_input_config()?;
+            .ok_or(StartRecordingError::DefaultInputDevice)?;
+        let mut config = device.default_input_config()?;
+        if is_vad {
+            config = SupportedStreamConfig::new(
+                1,
+                cpal::SampleRate(16000),
+                config.buffer_size().clone(),
+                cpal::SampleFormat::I16,
+            );
+        }
         let spec = wav_spec_from_config(&config);
-        let writer = hound::WavWriter::create(file.path(), spec)?;
+        let writer = hound::WavWriter::create(&file, spec)?;
         let writer = Arc::new(std::sync::Mutex::new(Some(writer)));
         let writer_2 = writer.clone();
 
@@ -56,11 +65,7 @@ impl Recording {
                 |e| error!("{}", e),
                 None,
             )?,
-            sample_format => {
-                return Err(anyhow::Error::msg(format!(
-                    "Unsupported sample format '{sample_format}'"
-                )))
-            }
+            sample_format => Err(StartRecordingError::UnsupportedSampleFormat(sample_format))?,
         };
 
         stream.play()?;
@@ -71,10 +76,10 @@ impl Recording {
         })
     }
 
-    pub fn stop(self) -> anyhow::Result<File> {
+    pub fn stop(self) -> Result<NamedTempFile, StopRecordingError> {
         drop(self.stream);
         self.writer.lock().unwrap().take().unwrap().finalize()?;
-        Ok(self.file.into_file())
+        Ok(self.file)
     }
 }
 
@@ -110,4 +115,28 @@ where
             }
         }
     }
+}
+
+#[derive(Error, Debug)]
+pub enum StartRecordingError {
+    #[error("Temporary file creation error")]
+    TemporaryFile(#[from] io::Error),
+    #[error("Cannot get default input device")]
+    DefaultInputDevice,
+    #[error(transparent)]
+    DefaultStreamConfig(#[from] DefaultStreamConfigError),
+    #[error(transparent)]
+    Hound(#[from] hound::Error),
+    #[error(transparent)]
+    BuildStream(#[from] BuildStreamError),
+    #[error("Unsupported sample format `{0}`")]
+    UnsupportedSampleFormat(cpal::SampleFormat),
+    #[error(transparent)]
+    PlayStream(#[from] PlayStreamError),
+}
+
+#[derive(Error, Debug)]
+pub enum StopRecordingError {
+    #[error(transparent)]
+    Hound(#[from] hound::Error),
 }

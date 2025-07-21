@@ -7,7 +7,6 @@ edition = "2021"
 anyhow = "1.0.98"
 async-openai = "0.28.1"
 async-trait = "0.1.88"
-client = "0.1.1-beta1"
 cpal = "0.16.0"
 dotenv = "0.15.0"
 env_logger = "0.11.8"
@@ -21,3 +20,4 @@ tempfile = "3.20.0"
 thiserror = "2.0.12"
 tokio = { version = "1.45.0", features = ["fs", "io-std", "macros", "rt", "rt-multi-thread", "tokio-macros"] }
 tokio-stream = "0.1.17"
+voice_activity_detector_silero_v5 = { version = "0.2.0-silero-v5", features = ["async"] }

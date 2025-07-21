@@ -14,14 +14,14 @@ use crate::{
 
 use super::{displayer::Displayer, messages};
 
-pub struct Pipeline {
+pub struct TextPipeline {
     client: Client<OpenAIConfig>,
     model: String,
     history_repo: Arc<dyn HistoryRepo>,
     tools_repo: Arc<ToolsRepo>,
 }
 
-impl Pipeline {
+impl TextPipeline {
     pub async fn new(
         api_base: &str,
         api_key: &str,
@@ -45,11 +45,8 @@ impl Pipeline {
         })
     }
 
-    pub async fn call(&mut self, prompt: &str, displayer: Arc<dyn Displayer>) -> Result<(), ()> {
-        self.history_repo
-            .add(&messages::user(prompt))
-            .await
-            .unwrap();
+    pub async fn process(&self, prompt: &str, displayer: Arc<dyn Displayer>) -> anyhow::Result<()> {
+        self.history_repo.add(&messages::user(prompt)).await?;
 
         let tools = self
             .tools_repo
@@ -61,7 +58,7 @@ impl Pipeline {
             .collect::<Vec<ChatCompletionTool>>();
 
         loop {
-            let history = self.history_repo.history().await.map_err(|_| ())?;
+            let history = self.history_repo.history().await?;
 
             let request = CreateChatCompletionRequest {
                 model: self.model.clone(),
@@ -72,7 +69,7 @@ impl Pipeline {
                 ..Default::default()
             };
 
-            let mut stream = self.client.chat().create_stream(request).await.unwrap();
+            let mut stream = self.client.chat().create_stream(request).await?;
 
             let mut tool_stream_collector = ToolStreamCollector::new();
             let mut content = String::new();
@@ -90,8 +87,12 @@ impl Pipeline {
                 let call_message = tool_stream_collector.add_data(choice);
                 if let Some(call_message) = call_message {
                     tool_call_messages.push(call_message.clone());
-                    let call = call_message.clone().try_into().unwrap();
-                    let call_tool_result = self.tools_repo.call_tool(call).await.unwrap();
+                    let call = call_message.clone().try_into()?;
+                    let call_tool_result = self
+                        .tools_repo
+                        .call_tool(&call)
+                        .await
+                        .expect(&format!("{:?}", &call));
                     displayer.display_tool_call_result(&call_tool_result).await;
                     tool_call_result_messages.push(messages::call_tool_result(
                         &call_message.id,
@@ -101,11 +102,10 @@ impl Pipeline {
             }
             self.history_repo
                 .add(&messages::assistant(content, tool_call_messages))
-                .await
-                .unwrap();
+                .await?;
 
             for tool_call_result in &tool_call_result_messages {
-                self.history_repo.add(&tool_call_result).await.unwrap();
+                self.history_repo.add(&tool_call_result).await?;
             }
 
             if tool_call_result_messages.is_empty() {
