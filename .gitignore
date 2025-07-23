@@ -2,4 +2,5 @@
 /logs
 .env
 history.json
+config.json
 
