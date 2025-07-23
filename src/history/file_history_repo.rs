@@ -1,6 +1,6 @@
 use std::{
     fs::{read_to_string, OpenOptions},
-    io::{self, Write},
+    io::{self, Write}, path::PathBuf,
 };
 
 use async_openai::types::{ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage};
@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use super::history_repo::HistoryRepo;
 
 pub struct FileHistoryRepo {
-    pub file_path: String,
+    pub file_path: PathBuf,
 }
 
 #[async_trait]

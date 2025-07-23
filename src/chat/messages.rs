@@ -36,7 +36,7 @@ pub fn assistant(
         } else {
             Some(tool_calls)
         },
-        function_call: None,
+        ..Default::default()
     })
 }
 

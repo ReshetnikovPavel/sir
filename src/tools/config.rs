@@ -1,20 +1,22 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct McpConfig {
-    pub servers: HashMap<String, McpServerConfig>,
+    pub mcp_servers: HashMap<String, McpServerConfig>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct McpServerConfig {
     #[serde(flatten)]
     pub transport: McpServerTransportConfig,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(untagged)]
+#[derive(Debug, Deserialize, Clone)]
+#[serde(untagged, rename_all = "camelCase")]
 pub enum McpServerTransportConfig {
     Sse {
         url: String,

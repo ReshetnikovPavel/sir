@@ -1,5 +1,3 @@
-use std::{fs::File, io::Read};
-
 use async_openai::{
     config::OpenAIConfig,
     error::OpenAIError,

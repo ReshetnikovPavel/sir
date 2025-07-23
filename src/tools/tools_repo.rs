@@ -24,7 +24,7 @@ pub struct WithErrors<T, E> {
 
 impl ToolsRepo {
     pub async fn from_config(config: &McpConfig) -> WithErrors<Self, mcp_server::Error> {
-        let tasks = config.servers.iter().map(|(name, server_config)| {
+        let tasks = config.mcp_servers.iter().map(|(name, server_config)| {
             let transport_config = server_config.transport.clone();
             let name = name.to_string();
             async move {

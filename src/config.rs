@@ -1,10 +1,21 @@
-use serde::{Deserialize, Serialize};
+use secrecy::{ExposeSecret, SecretString};
+use serde::{Deserialize, Deserializer};
 
-use crate::tools::config::McpConfig;
+use crate::{
+    audio::config::AudioConfig, chat::config::ChatConfig, history::config::HistoryConfig,
+    tools::config::McpConfig,
+};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Config {
+    #[serde(flatten)]
+    pub audio: AudioConfig,
+    #[serde(flatten)]
+    pub chat: ChatConfig,
+    #[serde(flatten)]
     pub mcp: McpConfig,
+    pub history: HistoryConfig,
 }
 
 impl Config {
@@ -13,5 +24,22 @@ impl Config {
             .await
             .expect("Can't open a config file");
         serde_json::from_str(&content).expect("Can't parse a config file")
+    }
+}
+
+pub fn from_env<'de, D>(deserializer: D) -> Result<SecretString, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let secret = SecretString::deserialize(deserializer)?;
+    let value = secret.expose_secret();
+    if value.starts_with('$') {
+        let value = &value[1..];
+        Ok(SecretString::from(std::env::var(value).expect(&format!(
+            "Environment variable {} must be set",
+            value
+        ))))
+    } else {
+        Ok(secret)
     }
 }

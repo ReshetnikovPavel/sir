@@ -1,16 +1,16 @@
-use std::{fs::read_to_string, sync::Arc, time::Duration};
+use std::{fs::read_to_string, sync::Arc};
 
 use async_openai::{config::OpenAIConfig, Client};
 use chat::pipeline::TextPipeline;
 use config::Config;
 use dotenv::dotenv;
 use history::file_history_repo::FileHistoryRepo;
-use log::warn;
+use secrecy::ExposeSecret;
 use tools::tools_repo::ToolsRepo;
 
 use crate::{
     audio::{audio_service::AudioService, openai_stt::OpenAISpeechToText},
-    cli::runtime::CliRuntime, tools::tools_repo,
+    cli::runtime::CliRuntime,
 };
 
 mod audio;
@@ -33,21 +33,16 @@ async fn main() {
     let tools_repo = tools_repo_with_errors.value;
     let tools_repo = Arc::new(tools_repo);
     let history_repo = Arc::new(FileHistoryRepo {
-        file_path: "history.json".to_string(),
+        file_path: config.history.path.clone(),
     });
 
-    let api_base = std::env::var("OPENAI_API_BASE").expect("OPENAI_API_BASE must be set");
-    let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set");
-    let model = std::env::var("OPENAI_MODEL").expect("OPENAI_MODEL must be set");
-    let system_prompt_path =
-        std::env::var("SYSTEM_PROMPT_PATH").expect("SYSTEM_PROMPT_PATH must be set");
     let system_prompt =
-        read_to_string(system_prompt_path).expect("System prompt file does not exist");
+        read_to_string(config.chat.system_prompt_path).expect("System prompt file does not exist");
 
     let text_pipeline = TextPipeline::new(
-        &api_base,
-        &api_key,
-        &model,
+        &config.chat.llm.api_base,
+        &config.chat.llm.api_key.expose_secret(),
+        &config.chat.llm.model,
         &system_prompt,
         history_repo,
         tools_repo,
@@ -57,14 +52,18 @@ async fn main() {
     let text_pipeline = Arc::new(text_pipeline);
 
     let stt = OpenAISpeechToText {
-        client: Client::with_config(OpenAIConfig::new().with_api_base("http://127.0.0.1:8000/v1")),
-        model: "whisper-tiny-ru-ct2".to_owned(),
+        client: Client::with_config(
+            OpenAIConfig::new()
+                .with_api_base(config.audio.stt.api_base)
+                .with_api_key(config.audio.stt.api_key.expose_secret()),
+        ),
+        model: config.audio.stt.model,
     };
     let stt = Arc::new(stt);
 
     let audio_service = AudioService {
         stt,
-        vad_record_duration: Duration::from_millis(500),
+        vad_record_duration: config.audio.vad.record_duration,
     };
     let audio_service = Arc::new(audio_service);
 
