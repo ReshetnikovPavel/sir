@@ -18,7 +18,7 @@ pub struct TextPipeline {
     client: Client<OpenAIConfig>,
     model: String,
     history_repo: Arc<dyn HistoryRepo>,
-    tools_repo: Arc<ToolsRepo>,
+    tools_repo: ToolsRepo,
 }
 
 impl TextPipeline {
@@ -28,7 +28,7 @@ impl TextPipeline {
         model: &str,
         system_prompt: &str,
         history_repo: Arc<dyn HistoryRepo>,
-        tools_repo: Arc<ToolsRepo>,
+        tools_repo: ToolsRepo,
     ) -> Result<Self, io::Error> {
         let config = OpenAIConfig::new()
             .with_api_base(api_base)

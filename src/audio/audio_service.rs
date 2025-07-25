@@ -1,7 +1,6 @@
 use async_openai::error::OpenAIError;
 use std::{
     io::{self, Read},
-    sync::Arc,
     time::Duration,
 };
 use thiserror::Error;
@@ -15,7 +14,7 @@ use crate::audio::{
 };
 
 pub struct AudioService {
-    pub stt: Arc<OpenAISpeechToText>,
+    pub stt: OpenAISpeechToText,
     pub vad_record_duration: Duration,
 }
 

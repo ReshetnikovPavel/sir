@@ -31,7 +31,6 @@ async fn main() {
         log::error!("{}", error)
     }
     let tools_repo = tools_repo_with_errors.value;
-    let tools_repo = Arc::new(tools_repo);
     let history_repo = Arc::new(FileHistoryRepo {
         file_path: config.history.path.clone(),
     });
@@ -49,7 +48,6 @@ async fn main() {
     )
     .await
     .expect("Cannot create a chat pipeline");
-    let text_pipeline = Arc::new(text_pipeline);
 
     let stt = OpenAISpeechToText {
         client: Client::with_config(
@@ -59,17 +57,15 @@ async fn main() {
         ),
         model: config.audio.stt.model,
     };
-    let stt = Arc::new(stt);
 
     let audio_service = AudioService {
         stt,
         vad_record_duration: config.audio.vad.record_duration,
     };
-    let audio_service = Arc::new(audio_service);
 
     let cli_runtime = CliRuntime {
-        text_pipeline: text_pipeline.clone(),
-        audio_service: audio_service.clone(),
+        text_pipeline: text_pipeline,
+        audio_service: audio_service,
     };
 
     cli_runtime.run().await;

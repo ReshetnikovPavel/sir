@@ -8,8 +8,8 @@ use crate::{audio::audio_service::AudioService, chat::pipeline::TextPipeline};
 use super::displayer::CliChunkDisplayer;
 
 pub struct CliRuntime {
-    pub text_pipeline: Arc<TextPipeline>,
-    pub audio_service: Arc<AudioService>,
+    pub text_pipeline: TextPipeline,
+    pub audio_service: AudioService,
 }
 
 impl CliRuntime {
