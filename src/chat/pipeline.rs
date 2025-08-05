@@ -1,4 +1,4 @@
-use std::{io, sync::Arc};
+use std::sync::Arc;
 use tokio_stream::StreamExt;
 
 use async_openai::{
@@ -6,47 +6,32 @@ use async_openai::{
     types::{ChatCompletionTool, ChatCompletionToolChoiceOption, CreateChatCompletionRequest},
     Client,
 };
+use uuid::Uuid;
 
 use crate::{
-    history::history_repo::HistoryRepo,
+    context::context_service::ContextService,
     tools::{tool_stream_collector::ToolStreamCollector, tools_repo::ToolsRepo},
 };
 
 use super::{displayer::Displayer, messages};
 
 pub struct TextPipeline {
-    client: Client<OpenAIConfig>,
-    model: String,
-    history_repo: Arc<dyn HistoryRepo>,
-    tools_repo: ToolsRepo,
+    pub client: Client<OpenAIConfig>,
+    pub model: String,
+    pub history_service: ContextService,
+    pub tools_repo: ToolsRepo,
 }
 
 impl TextPipeline {
-    pub async fn new(
-        api_base: &str,
-        api_key: &str,
-        model: &str,
-        system_prompt: &str,
-        history_repo: Arc<dyn HistoryRepo>,
-        tools_repo: ToolsRepo,
-    ) -> Result<Self, io::Error> {
-        let config = OpenAIConfig::new()
-            .with_api_base(api_base)
-            .with_api_key(api_key);
-        let client = Client::with_config(config);
-        let system_message = messages::system(system_prompt);
-        history_repo.set_system_message(system_message).await?;
-
-        Ok(Self {
-            client,
-            model: model.to_owned(),
-            history_repo,
-            tools_repo,
-        })
-    }
-
-    pub async fn process(&self, prompt: &str, displayer: Arc<dyn Displayer>) -> anyhow::Result<()> {
-        self.history_repo.add(&messages::user(prompt)).await?;
+    pub async fn process(
+        &self,
+        chat_id: Uuid,
+        prompt: &str,
+        displayer: Arc<dyn Displayer>,
+    ) -> anyhow::Result<()> {
+        self.history_service
+            .add_message(chat_id, &messages::user(prompt))
+            .await?;
 
         let tools_with_errors = self.tools_repo.tools().await;
         for error in tools_with_errors.errors {
@@ -60,7 +45,7 @@ impl TextPipeline {
             .collect::<Vec<ChatCompletionTool>>();
 
         loop {
-            let history = self.history_repo.history().await?;
+            let history = self.history_service.history(chat_id).await?;
 
             let request = CreateChatCompletionRequest {
                 model: self.model.clone(),
@@ -102,12 +87,14 @@ impl TextPipeline {
                     ));
                 }
             }
-            self.history_repo
-                .add(&messages::assistant(content, tool_call_messages))
+            self.history_service
+                .add_message(chat_id, &messages::assistant(content, tool_call_messages))
                 .await?;
 
             for tool_call_result in &tool_call_result_messages {
-                self.history_repo.add(&tool_call_result).await?;
+                self.history_service
+                    .add_message(chat_id, &tool_call_result)
+                    .await?;
             }
 
             if tool_call_result_messages.is_empty() {

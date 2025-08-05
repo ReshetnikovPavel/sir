@@ -2,7 +2,7 @@ use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Deserializer};
 
 use crate::{
-    audio::config::AudioConfig, chat::config::ChatConfig, history::config::HistoryConfig,
+    audio::config::AudioConfig, chat::config::ChatConfig,
     tools::config::McpConfig,
 };
 
@@ -15,7 +15,6 @@ pub struct Config {
     pub chat: ChatConfig,
     #[serde(flatten)]
     pub mcp: McpConfig,
-    pub history: HistoryConfig,
 }
 
 impl Config {

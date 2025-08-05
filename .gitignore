@@ -3,4 +3,5 @@
 .env
 history.json
 config.json
+sir.db*
 

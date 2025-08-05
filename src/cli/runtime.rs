@@ -1,20 +1,30 @@
 use std::{
+    fs::{self, read_to_string},
     io::{self, Write},
+    path::PathBuf,
+    rc::Rc,
     sync::Arc,
 };
 
-use crate::{audio::audio_service::AudioService, chat::pipeline::TextPipeline};
+use uuid::Uuid;
+
+use crate::{
+    audio::audio_service::AudioService, chat::pipeline::TextPipeline, db::chat_repo::ChatRepo,
+};
 
 use super::displayer::CliChunkDisplayer;
 
 pub struct CliRuntime {
     pub text_pipeline: TextPipeline,
     pub audio_service: AudioService,
+    pub chat_repo: Rc<ChatRepo>,
+    pub last_chat_id_path: PathBuf,
 }
 
 impl CliRuntime {
     pub async fn run(&self) {
         let chunk_displayer = Arc::new(CliChunkDisplayer::new());
+        let chat_id = self.get_chat_id().await;
 
         loop {
             let input = match self.read_input() {
@@ -33,14 +43,26 @@ impl CliRuntime {
                 None => continue,
             };
 
-            let result = self.text_pipeline
-                .process(&input, chunk_displayer.clone())
+            let result = self
+                .text_pipeline
+                .process(chat_id, &input, chunk_displayer.clone())
                 .await;
 
             if let Err(err) = result {
                 println!("Something went wrong while processing your request");
                 log::error!("{}", err)
             }
+        }
+    }
+
+    async fn get_chat_id(&self) -> Uuid {
+        match read_to_string(&self.last_chat_id_path) {
+            Ok(id) => Uuid::parse_str(&id).unwrap(),
+            Err(_) => {
+                let id = self.chat_repo.new_chat().await.unwrap();
+                fs::write(&self.last_chat_id_path, id.to_string()).unwrap();
+                id
+            },
         }
     }
 

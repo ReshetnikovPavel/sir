@@ -2,7 +2,7 @@ use async_openai::types::{ChatCompletionMessageToolCall, ChatCompletionTool, Fun
 use rmcp::{self, model::CallToolRequestParam};
 use serde_json::Value;
 
-pub type JsonObject<F = Value> = serde_json::Map<String, F>;
+use crate::types::JsonObject;
 
 #[derive(Clone, Debug)]
 pub struct Tool {

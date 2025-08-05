@@ -8,11 +8,11 @@ use async_openai::types::{
 };
 use rmcp::model::CallToolResult;
 
-pub fn system(prompt: &str) -> ChatCompletionRequestSystemMessage {
-    ChatCompletionRequestSystemMessage {
+pub fn system(prompt: &str) -> ChatCompletionRequestMessage {
+    ChatCompletionRequestMessage::System(ChatCompletionRequestSystemMessage {
         content: ChatCompletionRequestSystemMessageContent::Text(prompt.to_owned()),
         name: None,
-    }
+    })
 }
 
 pub fn user(prompt: &str) -> ChatCompletionRequestMessage {
