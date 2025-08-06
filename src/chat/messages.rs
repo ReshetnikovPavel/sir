@@ -8,6 +8,8 @@ use async_openai::types::{
 };
 use rmcp::model::CallToolResult;
 
+use crate::chat::messages;
+
 pub fn system(prompt: &str) -> ChatCompletionRequestMessage {
     ChatCompletionRequestMessage::System(ChatCompletionRequestSystemMessage {
         content: ChatCompletionRequestSystemMessageContent::Text(prompt.to_owned()),
@@ -57,4 +59,34 @@ pub fn call_tool_result(id: &str, result: &CallToolResult) -> ChatCompletionRequ
         ),
         tool_call_id: id.to_owned(),
     })
+}
+
+pub fn is_user(message: &ChatCompletionRequestMessage) -> bool {
+    match message {
+        ChatCompletionRequestMessage::User(_) => true,
+        _ => false,
+    }
+}
+
+pub fn is_assistant(message: &ChatCompletionRequestMessage) -> bool {
+    match message {
+        ChatCompletionRequestMessage::Assistant(_) => true,
+        _ => false,
+    }
+}
+
+pub fn is_tool(message: &ChatCompletionRequestMessage) -> bool {
+    match message {
+        ChatCompletionRequestMessage::Tool(_) => true,
+        _ => false,
+    }
+}
+
+pub fn is_assistant_with_tool_call(message: &ChatCompletionRequestMessage) -> bool {
+    if let ChatCompletionRequestMessage::Assistant(message) = message {
+        if let Some(tool_calls) = &message.tool_calls {
+            return !tool_calls.is_empty();
+        }
+    }
+    false
 }

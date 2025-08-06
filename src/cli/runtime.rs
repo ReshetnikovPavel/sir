@@ -57,7 +57,7 @@ impl CliRuntime {
 
     async fn get_chat_id(&self) -> Uuid {
         match read_to_string(&self.last_chat_id_path) {
-            Ok(id) => Uuid::parse_str(&id).unwrap(),
+            Ok(id) => Uuid::parse_str(&id.trim()).unwrap(),
             Err(_) => {
                 let id = self.chat_repo.new_chat().await.unwrap();
                 fs::write(&self.last_chat_id_path, id.to_string()).unwrap();
