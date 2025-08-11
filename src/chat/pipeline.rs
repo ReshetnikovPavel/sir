@@ -56,35 +56,41 @@ impl TextPipeline {
                 ..Default::default()
             };
 
+            // println!("{:#?}", request);
             let mut stream = self.client.chat().create_stream(request).await?;
 
             let mut tool_stream_collector = ToolStreamCollector::new();
             let mut content = String::new();
             let mut tool_call_messages = vec![];
             let mut tool_call_result_messages = vec![];
-            while let Some(Ok(response)) = stream.next().await {
-                let choice = &response.choices[0];
-                // println!("{:?}", choice);
-                if let Some(chunk) = &choice.delta.content {
-                    content.push_str(&chunk);
-                }
+            while let Some(response) = stream.next().await {
+                match response {
+                    Ok(response) => {
+                                        let choice = &response.choices[0];
+                                        // println!("{:?}", choice);
+                                        if let Some(chunk) = &choice.delta.content {
+                                            content.push_str(&chunk);
+                                        }
 
-                displayer.display_chunk(choice).await;
+                                        displayer.display_chunk(choice).await;
 
-                let call_message = tool_stream_collector.add_data(choice);
-                if let Some(call_message) = call_message {
-                    tool_call_messages.push(call_message.clone());
-                    let call = call_message.clone().try_into()?;
-                    let call_tool_result = self
-                        .tools_repo
-                        .call_tool(&call)
-                        .await
-                        .expect(&format!("{:?}", &call));
-                    displayer.display_tool_call_result(&call_tool_result).await;
-                    tool_call_result_messages.push(messages::call_tool_result(
-                        &call_message.id,
-                        &call_tool_result,
-                    ));
+                                        let call_message = tool_stream_collector.add_data(choice);
+                                        if let Some(call_message) = call_message {
+                                            tool_call_messages.push(call_message.clone());
+                                            let call = call_message.clone().try_into()?;
+                                            let call_tool_result = self
+                                                .tools_repo
+                                                .call_tool(&call)
+                                                .await
+                                                .expect(&format!("{:?}", &call));
+                                            displayer.display_tool_call_result(&call_tool_result).await;
+                                            tool_call_result_messages.push(messages::call_tool_result(
+                                                &call_message.id,
+                                                &call_tool_result,
+                                            ));
+                                        }
+                                    }
+                    Err(e) => log::error!("{}", e),
                 }
             }
             self.history_service
