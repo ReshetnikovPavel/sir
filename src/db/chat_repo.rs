@@ -1,8 +1,9 @@
 use std::rc::Rc;
 
-use async_openai::types::ChatCompletionRequestMessage;
 use libsql::{params, Connection};
 use uuid::Uuid;
+
+use crate::entities::messages::Message;
 
 pub struct ChatRepo {
     conn: Rc<Connection>,
@@ -29,7 +30,7 @@ impl ChatRepo {
     pub async fn add_message(
         &self,
         chat_id: Uuid,
-        message: &ChatCompletionRequestMessage,
+        message: &Message,
     ) -> Result<Uuid, libsql::Error> {
         let id = Uuid::now_v7();
         let message_json = serde_json::to_value(message).unwrap();
@@ -52,7 +53,7 @@ impl ChatRepo {
     pub async fn get_messages(
         &self,
         chat_id: Uuid,
-    ) -> Result<Vec<ChatCompletionRequestMessage>, libsql::Error> {
+    ) -> Result<Vec<Message>, libsql::Error> {
         let mut rows = self
             .conn
             .query(

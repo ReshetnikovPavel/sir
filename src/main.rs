@@ -1,27 +1,31 @@
 use std::{fs::read_to_string, path::PathBuf, rc::Rc};
 
 use async_openai::{config::OpenAIConfig, Client};
-use chat::pipeline::TextPipeline;
 use config::Config;
-use dotenv::dotenv;
 use context::context_service::ContextService;
+use dotenv::dotenv;
+use mcp::tools_repo::McpToolsRepo;
 use secrecy::ExposeSecret;
-use tools::tools_repo::ToolsRepo;
 
 use crate::{
     audio::{audio_service::AudioService, openai_stt::OpenAISpeechToText},
-    cli::runtime::CliRuntime,
+    cli::{
+        event_processor::{CliEventProcessor},
+        runtime::CliRuntime,
+    },
     db::chat_repo::ChatRepo,
+    entities::messages,
+    text::{openai_llm::OpenAILargeLanguageModel, pipeline::TextPipeline},
 };
 
 mod audio;
-mod chat;
 mod cli;
 mod config;
-mod db;
 mod context;
-mod tools;
-mod types;
+mod db;
+mod entities;
+mod mcp;
+mod text;
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 8)]
 async fn main() {
@@ -43,26 +47,34 @@ async fn main() {
     let system_prompt =
         read_to_string(config.chat.system_prompt_path).expect("System prompt file does not exist");
 
-    let history_service = ContextService {
+    let context_service = ContextService {
         chat_repo: chat_repo.clone(),
-        system_prompt,
+        system_prompt: messages::SystemMessage {
+            content: system_prompt,
+        },
     };
 
-    let tools_repo_with_errors = ToolsRepo::from_config(&config.mcp).await;
+    let tools_repo_with_errors = McpToolsRepo::from_config(&config.mcp).await;
     for error in tools_repo_with_errors.errors {
         log::error!("{}", error)
     }
     let tools_repo = tools_repo_with_errors.value;
 
-    let text_pipeline = TextPipeline {
+    let event_processor = Rc::new(CliEventProcessor {});
+    let llm = OpenAILargeLanguageModel {
         client: Client::with_config(
             OpenAIConfig::new()
                 .with_api_base(config.chat.llm.api_base)
                 .with_api_key(config.chat.llm.api_key.expose_secret()),
         ),
         model: config.chat.llm.model,
-        history_service,
+        event_processor: event_processor.clone(),
+    };
+    let text_pipeline = TextPipeline {
+        llm,
+        context_service,
         tools_repo,
+        event_processor: event_processor.clone(),
     };
 
     let stt = OpenAISpeechToText {
@@ -83,7 +95,7 @@ async fn main() {
         text_pipeline,
         audio_service,
         chat_repo,
-        last_chat_id_path: PathBuf::from("last_chat_id.txt")
+        last_chat_id_path: PathBuf::from("last_chat_id.txt"),
     };
 
     cli_runtime.run().await;

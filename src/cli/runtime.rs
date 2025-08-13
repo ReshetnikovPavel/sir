@@ -3,16 +3,13 @@ use std::{
     io::{self, Write},
     path::PathBuf,
     rc::Rc,
-    sync::Arc,
 };
 
 use uuid::Uuid;
 
 use crate::{
-    audio::audio_service::AudioService, chat::pipeline::TextPipeline, db::chat_repo::ChatRepo,
+    audio::audio_service::AudioService, db::chat_repo::ChatRepo, text::pipeline::TextPipeline, // text::pipeline::TextPipeline,
 };
-
-use super::displayer::CliChunkDisplayer;
 
 pub struct CliRuntime {
     pub text_pipeline: TextPipeline,
@@ -23,7 +20,6 @@ pub struct CliRuntime {
 
 impl CliRuntime {
     pub async fn run(&self) {
-        let chunk_displayer = Arc::new(CliChunkDisplayer::new());
         let chat_id = self.get_chat_id().await;
 
         loop {
@@ -43,10 +39,7 @@ impl CliRuntime {
                 None => continue,
             };
 
-            let result = self
-                .text_pipeline
-                .process(chat_id, &input, chunk_displayer.clone())
-                .await;
+            let result = self.text_pipeline.answer_prompt(chat_id, input).await;
 
             if let Err(err) = result {
                 println!("Something went wrong while processing your request");
@@ -62,7 +55,7 @@ impl CliRuntime {
                 let id = self.chat_repo.new_chat().await.unwrap();
                 fs::write(&self.last_chat_id_path, id.to_string()).unwrap();
                 id
-            },
+            }
         }
     }
 

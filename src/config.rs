@@ -2,8 +2,8 @@ use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Deserializer};
 
 use crate::{
-    audio::config::AudioConfig, chat::config::ChatConfig,
-    tools::config::McpConfig,
+    audio::config::AudioConfig, text::config::ChatConfig,
+    mcp::config::McpConfig,
 };
 
 #[derive(Debug, Deserialize, Clone)]

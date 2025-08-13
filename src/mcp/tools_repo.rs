@@ -5,15 +5,14 @@ use rmcp::{
     ServiceError,
 };
 
-use crate::tools::mcp_server;
-
-use super::{
-    config::McpConfig,
-    mcp_server::McpServer,
-    tool::{Tool, ToolCall},
+use crate::{
+    entities::tools::{Tool, ToolCall},
+    mcp,
 };
 
-pub struct ToolsRepo {
+use super::{config::McpConfig, server::McpServer};
+
+pub struct McpToolsRepo {
     servers: HashMap<String, McpServer>,
 }
 
@@ -22,13 +21,13 @@ pub struct WithErrors<T, E> {
     pub errors: Vec<E>,
 }
 
-impl ToolsRepo {
-    pub async fn from_config(config: &McpConfig) -> WithErrors<Self, mcp_server::Error> {
+impl McpToolsRepo {
+    pub async fn from_config(config: &McpConfig) -> WithErrors<Self, mcp::server::Error> {
         let tasks = config.mcp_servers.iter().map(|(name, server_config)| {
             let transport_config = server_config.transport.clone();
             let name = name.to_string();
             async move {
-                let server = mcp_server::new(&name, &transport_config).await?;
+                let server = mcp::server::new(&name, &transport_config).await?;
                 Ok((name, server))
             }
         });
