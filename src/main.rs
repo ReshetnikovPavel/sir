@@ -78,7 +78,6 @@ async fn main() {
                 .with_api_key(config.chat.llm.api_key.expose_secret()),
         ),
         model: config.chat.llm.model,
-        event_processor: event_processor.clone(),
     };
     let text_pipeline = TextPipeline {
         top_n_tools: config.top_n_tools,

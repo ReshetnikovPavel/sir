@@ -3,7 +3,7 @@ use async_openai::types::{
     ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage,
     ChatCompletionRequestSystemMessageContent, ChatCompletionRequestToolMessage,
     ChatCompletionRequestToolMessageContent, ChatCompletionRequestUserMessage,
-    ChatCompletionRequestUserMessageContent,
+    ChatCompletionRequestUserMessageContent, CreateChatCompletionResponse,
 };
 use rmcp::model::{CallToolResult, Content, RawContent, ResourceContents};
 use serde::{Deserialize, Serialize};
@@ -135,6 +135,21 @@ impl From<AssistantMessage> for ChatCompletionRequestAssistantMessage {
                     .collect(),
             ),
             ..Default::default()
+        }
+    }
+}
+
+impl From<CreateChatCompletionResponse> for AssistantMessage {
+    fn from(message: CreateChatCompletionResponse) -> Self {
+        let message = message.choices[0].message.clone();
+        Self {
+            content: message.content.unwrap_or_default(),
+            tool_calls: message
+                .tool_calls
+                .unwrap_or_default()
+                .into_iter()
+                .map(|tool_call| tool_call.try_into().unwrap())
+                .collect(),
         }
     }
 }
