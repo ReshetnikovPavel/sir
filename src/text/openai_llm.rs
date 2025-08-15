@@ -29,10 +29,10 @@ impl OpenAILargeLanguageModel {
     pub async fn stream(
         &self,
         messages: Vec<Message>,
-        tools: Vec<Tool>,
+        tools: Option<Vec<Tool>>,
     ) -> Result<Stream, OpenAIError> {
         let messages = messages.into_iter().map(|m| m.into()).collect();
-        let tools = Some(tools.into_iter().map(|t| t.into()).collect());
+        let tools = tools.map(|tools| tools.into_iter().map(|t| t.into()).collect());
 
         let request = CreateChatCompletionRequest {
             model: self.model.clone(),
@@ -42,6 +42,7 @@ impl OpenAILargeLanguageModel {
             tool_choice: Some(ChatCompletionToolChoiceOption::Auto),
             ..Default::default()
         };
+        println!("{:?}", request);
 
         let stream = self.client.chat().create_stream(request).await?;
         Ok(Stream::new(stream, self.event_processor.clone()))

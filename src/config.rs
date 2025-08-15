@@ -9,6 +9,7 @@ use crate::{
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
+    pub top_n_tools: usize,
     #[serde(flatten)]
     pub audio: AudioConfig,
     #[serde(flatten)]

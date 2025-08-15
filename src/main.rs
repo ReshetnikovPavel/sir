@@ -9,10 +9,8 @@ use secrecy::ExposeSecret;
 
 use crate::{
     audio::{audio_service::AudioService, openai_stt::OpenAISpeechToText},
-    cli::{
-        event_processor::{CliEventProcessor},
-        runtime::CliRuntime,
-    },
+    cli::{event_processor::CliEventProcessor, runtime::CliRuntime},
+    context::openai_embedding_model::OpenAIEmbeddingModel,
     db::chat_repo::ChatRepo,
     entities::messages,
     text::{openai_llm::OpenAILargeLanguageModel, pipeline::TextPipeline},
@@ -44,21 +42,33 @@ async fn main() {
         .expect("Unable to initialize chat repository");
     let chat_repo = Rc::new(chat_repo);
 
+    let tools_repo_with_errors = McpToolsRepo::from_config(&config.mcp).await;
+    for error in tools_repo_with_errors.errors {
+        log::error!("{}", error)
+    }
+    let tools_repo = Rc::new(tools_repo_with_errors.value);
+
+    let embedding_model = OpenAIEmbeddingModel {
+        client: Client::with_config(
+            OpenAIConfig::new()
+                .with_api_base(config.chat.embedding.api_base)
+                .with_api_key(config.chat.embedding.api_key.expose_secret()),
+        ),
+        model: config.chat.embedding.model,
+    };
+    let embedding_model = Rc::new(embedding_model);
+
     let system_prompt =
         read_to_string(config.chat.system_prompt_path).expect("System prompt file does not exist");
 
     let context_service = ContextService {
         chat_repo: chat_repo.clone(),
+        tools_repo: tools_repo.clone(),
+        embedding_model: embedding_model.clone(),
         system_prompt: messages::SystemMessage {
             content: system_prompt,
         },
     };
-
-    let tools_repo_with_errors = McpToolsRepo::from_config(&config.mcp).await;
-    for error in tools_repo_with_errors.errors {
-        log::error!("{}", error)
-    }
-    let tools_repo = tools_repo_with_errors.value;
 
     let event_processor = Rc::new(CliEventProcessor {});
     let llm = OpenAILargeLanguageModel {
@@ -71,9 +81,10 @@ async fn main() {
         event_processor: event_processor.clone(),
     };
     let text_pipeline = TextPipeline {
+        top_n_tools: config.top_n_tools,
         llm,
         context_service,
-        tools_repo,
+        tools_repo: tools_repo.clone(),
         event_processor: event_processor.clone(),
     };
 

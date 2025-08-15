@@ -1,12 +1,23 @@
 use std::rc::Rc;
 
+use simsimd::{f16, SpatialSimilarity};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::{db::chat_repo::ChatRepo, entities::messages::{self, Message}};
+use crate::{
+    context::openai_embedding_model::OpenAIEmbeddingModel,
+    db::chat_repo::ChatRepo,
+    entities::{
+        messages::{self, Message, UserMessage},
+        tools::Tool,
+    },
+    mcp::tools_repo::McpToolsRepo,
+};
 
 pub struct ContextService {
     pub chat_repo: Rc<ChatRepo>,
+    pub tools_repo: Rc<McpToolsRepo>,
+    pub embedding_model: Rc<OpenAIEmbeddingModel>,
     pub system_prompt: messages::SystemMessage,
 }
 
@@ -39,6 +50,47 @@ impl ContextService {
             .filter(|m| !Message::is_tool(&m) && !Message::is_assistant_with_tool_call(&m))
             .chain(after_latest_tool)
             .collect()
+    }
+
+    pub async fn most_relevant_tools(
+        &self,
+        message: &UserMessage,
+        tools: &[Tool],
+        top_n: usize,
+    ) -> anyhow::Result<Vec<Tool>> {
+        let mut texts = vec![message.content.clone()];
+        let tool_texts = tools
+            .iter()
+            .map(|tool| format!("{}\n{}", tool.name, tool.description));
+        texts.extend(tool_texts);
+
+        let mut embeddings = self
+            .embedding_model
+            .get_embeddings(texts)
+            .await?
+            .into_iter()
+            .map(|embedding| embedding.into_iter().map(|x| f16::from_f32(x)).collect());
+
+        let message_embedding = embeddings.next().unwrap();
+        let tool_embeddings = embeddings.collect::<Vec<Vec<f16>>>();
+
+        let mut distancies_with_tools = tool_embeddings
+            .into_iter()
+            .map(|tool_embedding| f16::cos(&message_embedding, &tool_embedding).unwrap())
+            .zip(tools)
+            .collect::<Vec<_>>();
+
+        distancies_with_tools
+            .sort_unstable_by(|(distance, _), (other, _)| distance.total_cmp(other));
+        // println!("{:?}", distancies_with_tools.iter().map(|(d, t)| (d, t.name.clone())).collect::<Vec<_>>());
+
+        let tools = distancies_with_tools
+            .into_iter()
+            .map(|(_, tool)| tool.clone())
+            .take(top_n)
+            .collect::<Vec<_>>();
+
+        Ok(tools)
     }
 }
 

@@ -9,6 +9,7 @@ use crate::config::from_env;
 #[serde(rename_all = "camelCase")]
 pub struct ChatConfig {
     pub llm: OpenAIConfig,
+    pub embedding: OpenAIConfig,
     pub system_prompt_path: PathBuf
 }
 

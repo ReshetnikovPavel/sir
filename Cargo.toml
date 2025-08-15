@@ -20,6 +20,7 @@ rmcp = { version = "0.1.5", features = ["client", "transport-child-process", "tr
 secrecy = { version = "0.10.3", features = ["serde"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
+simsimd = "6.5.0"
 tempfile = "3.20.0"
 thiserror = "2.0.12"
 tokio = { version = "1.45.0", features = ["fs", "full", "io-std", "macros", "rt", "rt-multi-thread", "tokio-macros"] }

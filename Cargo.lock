@@ -2984,6 +2984,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "simsimd"
+version = "6.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "65fb3d00fb87b979c46e28db0c642bc45aea0b11486acfc277ebb92554d5a6d1"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "siphasher"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3009,6 +3018,7 @@ dependencies = [
  "secrecy",
  "serde",
  "serde_json",
+ "simsimd",
  "tempfile",
  "thiserror 2.0.12",
  "tokio",

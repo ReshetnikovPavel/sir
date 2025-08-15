@@ -5,7 +5,7 @@ use serde_json::Value;
 
 use crate::entities::json::JsonObject;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Tool {
     pub name: String,
     pub description: String,
