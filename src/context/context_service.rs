@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use async_openai::error::OpenAIError;
 use simsimd::{f16, SpatialSimilarity};
 use thiserror::Error;
 use uuid::Uuid;
@@ -8,17 +9,20 @@ use crate::{
     context::openai_embedding_model::OpenAIEmbeddingModel,
     db::chat_repo::ChatRepo,
     entities::{
-        messages::{self, Message, UserMessage},
+        messages::{self, Message},
         tools::Tool,
     },
     mcp::tools_repo::McpToolsRepo,
+    text::events::{Event, EventProcessor},
 };
 
 pub struct ContextService {
     pub chat_repo: Rc<ChatRepo>,
     pub tools_repo: Rc<McpToolsRepo>,
     pub embedding_model: Rc<OpenAIEmbeddingModel>,
+    pub event_processor: Rc<dyn EventProcessor>,
     pub system_prompt: messages::SystemMessage,
+    pub top_n_tools: usize,
 }
 
 impl ContextService {
@@ -27,7 +31,14 @@ impl ContextService {
         Ok(())
     }
 
-    pub async fn history(&self, chat_id: Uuid) -> Result<Vec<Message>, Error> {
+    pub async fn context(&self, chat_id: Uuid) -> Result<(Vec<Message>, Vec<Tool>), Error> {
+        let history = self.history(chat_id).await?;
+        let tools = self.tools(&history).await?;
+
+        Ok((history, tools))
+    }
+
+    async fn history(&self, chat_id: Uuid) -> Result<Vec<Message>, Error> {
         let system_message = Message::System(self.system_prompt.clone());
         let chat = self.chat_repo.get_messages(chat_id).await?;
         let chat = self.without_old_tool_calls(chat);
@@ -52,13 +63,38 @@ impl ContextService {
             .collect()
     }
 
-    pub async fn most_relevant_tools(
+    async fn tools(&self, messages: &[Message]) -> Result<Vec<Tool>, Error> {
+        let get_tools_result = self.tools_repo.tools().await;
+        let tools = get_tools_result.value;
+
+        for error in get_tools_result.errors {
+            self.event_processor
+                .process(Event::Error(error.into()))
+                .await;
+        }
+
+        self.most_relevant_tools(messages, &tools, self.top_n_tools)
+            .await
+    }
+
+    async fn most_relevant_tools(
         &self,
-        message: &UserMessage,
+        messages: &[Message],
         tools: &[Tool],
         top_n: usize,
-    ) -> anyhow::Result<Vec<Tool>> {
-        let mut texts = vec![message.content.clone()];
+    ) -> Result<Vec<Tool>, Error> {
+        let messages_text = messages[messages.len().saturating_sub(5)..]
+            .iter()
+            .filter(|m| m.is_user() || m.is_assistant_without_tool_call())
+            .map(|m| match m {
+                Message::User(user_message) => user_message.content.clone(),
+                Message::Assistant(assistant_message) => assistant_message.content.clone(),
+                _ => unreachable!(),
+            } + "\n")
+            .collect::<String>();
+
+        let mut texts = vec![messages_text];
+
         let tool_texts = tools
             .iter()
             .map(|tool| format!("{}\n{}", tool.name, tool.description));
@@ -82,7 +118,14 @@ impl ContextService {
 
         distancies_with_tools
             .sort_unstable_by(|(distance, _), (other, _)| distance.total_cmp(other));
-        // println!("{:?}", distancies_with_tools.iter().map(|(d, t)| (d, t.name.clone())).collect::<Vec<_>>());
+
+        println!(
+            "{:#?}",
+            distancies_with_tools
+                .iter()
+                .map(|(d, t)| (d, t.name.clone()))
+                .collect::<Vec<_>>()
+        );
 
         let tools = distancies_with_tools
             .into_iter()
@@ -98,4 +141,8 @@ impl ContextService {
 pub enum Error {
     #[error(transparent)]
     SQL(#[from] libsql::Error),
+    #[error(transparent)]
+    MCP(#[from] rmcp::ServiceError),
+    #[error(transparent)]
+    OpenAI(#[from] OpenAIError),
 }

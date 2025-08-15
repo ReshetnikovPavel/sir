@@ -55,6 +55,13 @@ impl Message {
             _ => false,
         }
     }
+
+    pub fn is_assistant_without_tool_call(&self) -> bool {
+        match self {
+            Message::Assistant(assistant) => assistant.tool_calls.is_empty(),
+            _ => false,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

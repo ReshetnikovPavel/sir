@@ -27,6 +27,8 @@ mod text;
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 8)]
 async fn main() {
+    let event_processor = Rc::new(CliEventProcessor {});
+
     dotenv().ok();
     env_logger::init();
     let config = Config::load("config.json").await;
@@ -65,12 +67,13 @@ async fn main() {
         chat_repo: chat_repo.clone(),
         tools_repo: tools_repo.clone(),
         embedding_model: embedding_model.clone(),
+        event_processor: event_processor.clone(),
+        top_n_tools: config.top_n_tools,
         system_prompt: messages::SystemMessage {
             content: system_prompt,
         },
     };
 
-    let event_processor = Rc::new(CliEventProcessor {});
     let llm = OpenAILargeLanguageModel {
         client: Client::with_config(
             OpenAIConfig::new()
@@ -80,7 +83,6 @@ async fn main() {
         model: config.chat.llm.model,
     };
     let text_pipeline = TextPipeline {
-        top_n_tools: config.top_n_tools,
         llm,
         context_service,
         tools_repo: tools_repo.clone(),
