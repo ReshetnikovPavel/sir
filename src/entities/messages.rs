@@ -1,14 +1,11 @@
 use async_openai::types::{
-    ChatCompletionRequestAssistantMessage, ChatCompletionRequestAssistantMessageContent,
-    ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage,
-    ChatCompletionRequestSystemMessageContent, ChatCompletionRequestToolMessage,
-    ChatCompletionRequestToolMessageContent, ChatCompletionRequestUserMessage,
-    ChatCompletionRequestUserMessageContent, CreateChatCompletionResponse,
+    ChatCompletionMessageToolCall, ChatCompletionRequestAssistantMessage, ChatCompletionRequestAssistantMessageContent, ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage, ChatCompletionRequestSystemMessageContent, ChatCompletionRequestToolMessage, ChatCompletionRequestToolMessageContent, ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageContent, CreateChatCompletionResponse, FunctionCall
 };
 use rmcp::model::{CallToolResult, Content, RawContent, ResourceContents};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
-use crate::entities::tools::ToolCall;
+use crate::entities::json::JsonObject;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "role")]
@@ -77,7 +74,14 @@ pub struct UserMessage {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AssistantMessage {
     pub content: String,
-    pub tool_calls: Vec<ToolCall>,
+    pub tool_calls: Vec<ToolCallMessage>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ToolCallMessage {
+    pub id: String,
+    pub name: String,
+    pub arguments: JsonObject,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -190,5 +194,31 @@ impl From<ToolMessage> for ChatCompletionRequestToolMessage {
             ),
             tool_call_id: message.tool_call_id,
         }
+    }
+}
+
+impl From<ToolCallMessage> for ChatCompletionMessageToolCall {
+    fn from(tool_call: ToolCallMessage) -> Self {
+        Self {
+            id: tool_call.id,
+            r#type: async_openai::types::ChatCompletionToolType::Function,
+            function: FunctionCall {
+                name: tool_call.name,
+                arguments: Value::Object(tool_call.arguments).to_string(),
+            }
+        }
+    }
+}
+
+
+impl TryFrom<ChatCompletionMessageToolCall> for ToolCallMessage {
+    type Error = serde_json::Error;
+
+    fn try_from(tool_call: ChatCompletionMessageToolCall) -> Result<Self, Self::Error> {
+        Ok(Self {
+            id: tool_call.id,
+            name: tool_call.function.name,
+            arguments: serde_json::from_str(&tool_call.function.arguments)?,
+        })
     }
 }

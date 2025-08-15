@@ -1,10 +1,13 @@
-use std::rc::Rc;
+use std::{collections::HashMap, rc::Rc};
 
 use uuid::Uuid;
 
 use crate::{
     context::context_service::ContextService,
-    entities::messages::{AssistantMessage, Message, ToolMessage, UserMessage},
+    entities::{
+        messages::{AssistantMessage, Message, ToolMessage, UserMessage},
+        tools::ToolCall,
+    },
     mcp::tools_repo::McpToolsRepo,
     text::{
         events::{Event, EventProcessor},
@@ -45,6 +48,10 @@ impl TextPipeline {
         chat_id: Uuid,
     ) -> anyhow::Result<AssistantMessage> {
         let (history, tools) = self.context_service.context(chat_id).await?;
+        let tools_by_names = tools
+            .iter()
+            .map(|tool| (tool.name.clone(), tool.clone()))
+            .collect::<HashMap<_, _>>();
 
         let assistant_message = self.llm.chat(history, Some(tools)).await?;
         self.event_processor
@@ -54,32 +61,47 @@ impl TextPipeline {
             .process(Event::AssistantResponded)
             .await;
 
-        for tool_call in &assistant_message.tool_calls {
+        for tool_call_message in &assistant_message.tool_calls {
             self.event_processor
-                .process(Event::ToolCall(tool_call.clone()))
+                .process(Event::ToolCall(tool_call_message.clone()))
                 .await;
         }
 
-        for tool_call in &assistant_message.tool_calls {
-            match self.tools_repo.call_tool(&tool_call).await {
-                Ok(tool_call_result) => {
-                    let tool_message =
-                        ToolMessage::from_call_tool_result(tool_call.id.clone(), tool_call_result);
+        let tool_calls = assistant_message
+            .tool_calls
+            .iter()
+            .map(|tool_call_message| {
+                let tool = tools_by_names.get(&tool_call_message.name).unwrap();
+                ToolCall::from_message_and_server_name(
+                    tool_call_message.clone(),
+                    tool.server_name.clone(),
+                )
+            })
+            .collect::<Vec<_>>();
 
+        let tool_call_ids = tool_calls
+            .iter()
+            .map(|tc| tc.id.clone())
+            .collect::<Vec<_>>();
+
+        let call_tool_results = self.tools_repo.call_tools(tool_calls).await;
+
+        for (id, res) in tool_call_ids.into_iter().zip(call_tool_results) {
+            match res {
+                Ok(res) => {
+                    let tool_message = ToolMessage::from_call_tool_result(id, res);
                     self.event_processor
                         .process(Event::ToolCallResult(tool_message.clone()))
                         .await;
-
                     self.context_service
                         .add_message(chat_id, &Message::Tool(tool_message))
-                        .await?;
+                        .await?
                 }
                 Err(e) => {
                     self.event_processor.process(Event::Error(e.into())).await;
                 }
             }
         }
-
         Ok(assistant_message)
     }
 }

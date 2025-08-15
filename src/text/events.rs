@@ -1,11 +1,11 @@
 use async_trait::async_trait;
 
-use crate::entities::{messages::ToolMessage, tools::ToolCall};
+use crate::entities::messages::{ToolCallMessage, ToolMessage};
 
 pub enum Event {
     Error(anyhow::Error),
     ResponseTextChunk(String),
-    ToolCall(ToolCall),
+    ToolCall(ToolCallMessage),
     ToolCallResult(ToolMessage),
     AssistantResponded,
 }

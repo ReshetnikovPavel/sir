@@ -46,8 +46,12 @@ impl McpToolsRepo {
     }
 
     pub async fn tools(&self) -> WithErrors<Vec<Tool>, ServiceError> {
-        let tasks = self.servers.iter().map(|(_, server)| async {
-            Ok(server.list_all_tools().await?.into_iter().map(|t| t.into()))
+        let tasks = self.servers.iter().map(|(server_name, server)| async {
+            Ok(server
+                .list_all_tools()
+                .await?
+                .into_iter()
+                .map(|t| Tool::from_rmcp_and_server_name(t, server_name.clone())))
         });
         let results = futures::future::join_all(tasks).await;
         let (tools, errors): (Vec<_>, Vec<_>) =
@@ -66,29 +70,22 @@ impl McpToolsRepo {
         }
     }
 
-    pub async fn call_tool(&self, tool_call: &ToolCall) -> Result<CallToolResult, ServiceError> {
-        let tasks = self.servers.iter().map(|(_, server)| {
-            let tool_call = tool_call.clone();
-            async {
-                let has_tool = server
-                    .list_all_tools()
-                    .await?
-                    .into_iter()
-                    .any(|t| t.name == tool_call.name);
-                if has_tool {
-                    server.call_tool(tool_call.into()).await
-                } else {
-                    Err(method_not_found())
-                }
-            }
-        });
-
-        futures::future::join_all(tasks)
-            .await
+    pub async fn call_tools(
+        &self,
+        tool_calls: Vec<ToolCall>,
+    ) -> Vec<Result<CallToolResult, ServiceError>> {
+        let tasks = tool_calls
             .into_iter()
-            .filter_map(|r| r.ok())
-            .next()
-            .ok_or(method_not_found())
+            .map(|tool_call| async { self.call_tool(tool_call).await });
+        futures::future::join_all(tasks).await
+    }
+
+    pub async fn call_tool(&self, tool_call: ToolCall) -> Result<CallToolResult, ServiceError> {
+        let server = self
+            .servers
+            .get(&tool_call.server_name)
+            .ok_or(method_not_found())?;
+        server.call_tool(tool_call.into()).await
     }
 }
 

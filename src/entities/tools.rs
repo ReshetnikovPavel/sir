@@ -1,15 +1,16 @@
-use async_openai::types::{ChatCompletionMessageToolCall, ChatCompletionTool, FunctionCall, FunctionObject};
+use async_openai::types::{ChatCompletionTool, FunctionObject};
 use rmcp::{self, model::CallToolRequestParam};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::entities::json::JsonObject;
+use crate::entities::{json::JsonObject, messages::ToolCallMessage};
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Tool {
     pub name: String,
     pub description: String,
     pub parameters: JsonObject,
+    pub server_name: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -17,14 +18,16 @@ pub struct ToolCall {
     pub id: String,
     pub name: String,
     pub arguments: JsonObject,
+    pub server_name: String,
 }
 
-impl From<rmcp::model::Tool> for Tool {
-    fn from(tool: rmcp::model::Tool) -> Self {
+impl Tool {
+    pub fn from_rmcp_and_server_name(tool: rmcp::model::Tool, server_name: String) -> Self {
         Self {
             name: tool.name.to_string(),
             description: tool.description.to_string(),
             parameters: (*tool.input_schema).clone(),
+            server_name,
         }
     }
 }
@@ -43,6 +46,17 @@ impl From<Tool> for ChatCompletionTool {
     }
 }
 
+impl ToolCall {
+    pub fn from_message_and_server_name(tool_call: ToolCallMessage, server_name: String) -> Self {
+        Self {
+            id: tool_call.id,
+            name: tool_call.name,
+            arguments: tool_call.arguments,
+            server_name,
+        }
+    }
+}
+
 impl From<ToolCall> for CallToolRequestParam  {
     fn from(tool_call: ToolCall) -> Self {
         Self {
@@ -52,27 +66,3 @@ impl From<ToolCall> for CallToolRequestParam  {
     }
 }
 
-impl TryFrom<ChatCompletionMessageToolCall> for ToolCall {
-    type Error = serde_json::Error;
-
-    fn try_from(tool_call: ChatCompletionMessageToolCall) -> Result<Self, Self::Error> {
-        Ok(Self {
-            id: tool_call.id,
-            name: tool_call.function.name,
-            arguments: serde_json::from_str(&tool_call.function.arguments)?,
-        })
-    }
-}
-
-impl From<ToolCall> for ChatCompletionMessageToolCall {
-    fn from(tool_call: ToolCall) -> Self {
-        Self {
-            id: tool_call.id,
-            r#type: async_openai::types::ChatCompletionToolType::Function,
-            function: FunctionCall {
-                name: tool_call.name,
-                arguments: Value::Object(tool_call.arguments).to_string(),
-            }
-        }
-    }
-}
