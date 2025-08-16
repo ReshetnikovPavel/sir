@@ -27,7 +27,7 @@ impl TextPipeline {
         &self,
         chat_id: Uuid,
         user_prompt: String,
-    ) -> anyhow::Result<AssistantMessage> {
+    ) -> anyhow::Result<Vec<AssistantMessage>> {
         let user_message = UserMessage {
             content: user_prompt + " /no_think",
         };
@@ -36,11 +36,15 @@ impl TextPipeline {
             .add_message(chat_id, &Message::User(user_message.clone()))
             .await?;
 
-        let assistant_message = self.generate_new_assistant_message(chat_id).await?;
-        if assistant_message.tool_calls.is_empty() {
-            return Ok(assistant_message);
+        let mut responses = vec![];
+        loop {
+            let assistant_message = self.generate_new_assistant_message(chat_id).await?;
+            if assistant_message.tool_calls.is_empty() {
+                responses.push(assistant_message);
+                return Ok(responses);
+            }
+            responses.push(assistant_message);
         }
-        return self.generate_new_assistant_message(chat_id).await;
     }
 
     pub async fn generate_new_assistant_message(
