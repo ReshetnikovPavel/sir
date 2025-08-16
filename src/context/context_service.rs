@@ -38,7 +38,7 @@ impl ContextService {
         Ok((history, tools))
     }
 
-    async fn history(&self, chat_id: Uuid) -> Result<Vec<Message>, Error> {
+    pub async fn history(&self, chat_id: Uuid) -> Result<Vec<Message>, Error> {
         let system_message = Message::System(self.system_prompt.clone());
         let chat = self.chat_repo.get_messages(chat_id).await?;
         let chat = self.without_old_tool_calls(chat);

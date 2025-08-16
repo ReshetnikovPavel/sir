@@ -36,9 +36,16 @@ impl TextPipeline {
             .add_message(chat_id, &Message::User(user_message.clone()))
             .await?;
 
-        let mut responses = vec![];
+        let mut responses: Vec<AssistantMessage> = vec![];
         loop {
-            let assistant_message = self.generate_new_assistant_message(chat_id).await?;
+            let not_use_tools = responses
+                .last()
+                .is_some_and(|latest_message| !latest_message.tool_calls.is_empty());
+
+            let assistant_message = self
+                .generate_new_assistant_message(chat_id, !not_use_tools)
+                .await?;
+
             if assistant_message.tool_calls.is_empty() {
                 responses.push(assistant_message);
                 return Ok(responses);
@@ -50,14 +57,24 @@ impl TextPipeline {
     pub async fn generate_new_assistant_message(
         &self,
         chat_id: Uuid,
+        use_tools: bool,
     ) -> anyhow::Result<AssistantMessage> {
-        let (history, tools) = self.context_service.context(chat_id).await?;
+        let (history, tools) = if use_tools {
+            self.context_service.context(chat_id).await?
+        } else {
+            (self.context_service.history(chat_id).await?, vec![])
+        };
+
         let tools_by_names = tools
             .iter()
             .map(|tool| (tool.name.clone(), tool.clone()))
             .collect::<HashMap<_, _>>();
 
-        let assistant_message = self.llm.chat(history, Some(tools)).await?;
+        let assistant_message = self
+            .llm
+            .chat(history, if tools.is_empty() { None } else { Some(tools) })
+            .await?;
+
         self.event_processor
             .process(Event::ResponseTextChunk(assistant_message.content.clone()))
             .await;
