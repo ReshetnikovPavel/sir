@@ -83,7 +83,7 @@ impl ContextService {
         tools: &[Tool],
         top_n: usize,
     ) -> Result<Vec<Tool>, Error> {
-        let messages_text = messages[messages.len().saturating_sub(5)..]
+        let messages_text = messages[messages.len().saturating_sub(3)..]
             .iter()
             .filter(|m| m.is_user() || m.is_assistant_without_tool_call())
             .map(|m| match m {
