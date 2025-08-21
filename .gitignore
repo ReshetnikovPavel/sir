@@ -1,5 +1,6 @@
 /target
 /logs
+/.cache
 .env
 history.json
 config.json
