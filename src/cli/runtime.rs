@@ -2,7 +2,7 @@ use std::{
     fs::{self, read_to_string},
     io::{self, Write},
     path::PathBuf,
-    rc::Rc,
+    rc::Rc, time::Duration,
 };
 
 use uuid::Uuid;
@@ -23,6 +23,7 @@ impl CliRuntime {
         let chat_id = self.get_chat_id().await;
 
         loop {
+            tokio::time::sleep(Duration::from_secs(1)).await;
             let input = match self.read_input() {
                 Ok(input) => input,
                 Err(err) => {

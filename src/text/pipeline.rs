@@ -10,7 +10,7 @@ use crate::{
     },
     mcp::tools_repo::McpToolsRepo,
     text::{
-        events::{Event, EventProcessor},
+        events::{Event, EventEmitter},
         openai_llm::OpenAILargeLanguageModel,
     },
 };
@@ -19,7 +19,7 @@ pub struct TextPipeline {
     pub llm: OpenAILargeLanguageModel,
     pub context_service: ContextService,
     pub tools_repo: Rc<McpToolsRepo>,
-    pub event_processor: Rc<dyn EventProcessor>,
+    pub event_emitter: Rc<dyn EventEmitter>,
 }
 
 impl TextPipeline {
@@ -70,21 +70,23 @@ impl TextPipeline {
             .map(|tool| (tool.name.clone(), tool.clone()))
             .collect::<HashMap<_, _>>();
 
+        self.event_emitter.emit(Event::RequestedAssistant).await;
+
         let assistant_message = self
             .llm
             .chat(history, if tools.is_empty() { None } else { Some(tools) })
             .await?;
 
-        self.event_processor
-            .process(Event::ResponseTextChunk(assistant_message.content.clone()))
+        self.event_emitter
+            .emit(Event::ResponseTextChunk(assistant_message.content.clone()))
             .await;
-        self.event_processor
-            .process(Event::AssistantResponded)
+        self.event_emitter
+            .emit(Event::AssistantResponded)
             .await;
 
         for tool_call_message in &assistant_message.tool_calls {
-            self.event_processor
-                .process(Event::ToolCall(tool_call_message.clone()))
+            self.event_emitter
+                .emit(Event::ToolCall(tool_call_message.clone()))
                 .await;
         }
 
@@ -111,15 +113,15 @@ impl TextPipeline {
             match res {
                 Ok(res) => {
                     let tool_message = ToolMessage::from_call_tool_result(id, res);
-                    self.event_processor
-                        .process(Event::ToolCallResult(tool_message.clone()))
+                    self.event_emitter
+                        .emit(Event::ToolCallResult(tool_message.clone()))
                         .await;
                     self.context_service
                         .add_message(chat_id, &Message::Tool(tool_message))
                         .await?
                 }
                 Err(e) => {
-                    self.event_processor.process(Event::Error(e.into())).await;
+                    self.event_emitter.emit(Event::Error(e.into())).await;
                 }
             }
         }

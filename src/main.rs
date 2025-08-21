@@ -1,4 +1,4 @@
-use std::{fs::read_to_string, path::PathBuf, rc::Rc};
+use std::{collections::HashMap, fs::read_to_string, path::PathBuf, rc::Rc, thread};
 
 use async_openai::{config::OpenAIConfig, Client};
 use config::Config;
@@ -6,14 +6,22 @@ use context::context_service::ContextService;
 use dotenv::dotenv;
 use mcp::tools_repo::McpToolsRepo;
 use secrecy::ExposeSecret;
+use tokio::sync::mpsc::{self, Sender};
 
 use crate::{
     audio::{audio_service::AudioService, openai_stt::OpenAISpeechToText},
-    cli::{event_processor::CliEventProcessor, runtime::CliRuntime},
+    cli::{
+        event_processor::{CliEventProcessor, MpscEventEmitter},
+        runtime::CliRuntime,
+    },
     context::openai_embedding_model::OpenAIEmbeddingModel,
     db::chat_repo::ChatRepo,
     entities::messages,
-    text::{openai_llm::OpenAILargeLanguageModel, pipeline::TextPipeline},
+    text::{
+        events::{Event, EventEmitter},
+        openai_llm::OpenAILargeLanguageModel,
+        pipeline::TextPipeline,
+    },
 };
 
 mod audio;
@@ -27,10 +35,20 @@ mod text;
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 8)]
 async fn main() {
-    let event_processor = Rc::new(CliEventProcessor {});
-
     dotenv().ok();
     env_logger::init();
+
+    let (tx, rx) = mpsc::channel::<Event>(128);
+    let mut event_processor = CliEventProcessor { rx, stopwatches: HashMap::new() };
+    let event_processor_handle = thread::spawn(async move || {
+        event_processor.run().await;
+    });
+
+    tokio::join!(event_processor_handle.join().unwrap(), startup(tx));
+}
+
+async fn startup(tx: Sender<Event>) {
+    let event_emitter = Rc::new(MpscEventEmitter { tx });
     let config = Config::load("config.json").await;
 
     let db = libsql::Builder::new_local("sir.db")
@@ -44,11 +62,13 @@ async fn main() {
         .expect("Unable to initialize chat repository");
     let chat_repo = Rc::new(chat_repo);
 
+    event_emitter.emit(Event::StartLoadingTools).await;
     let tools_repo_with_errors = McpToolsRepo::from_config(&config.mcp).await;
     for error in tools_repo_with_errors.errors {
         log::error!("{}", error)
     }
     let tools_repo = Rc::new(tools_repo_with_errors.value);
+    event_emitter.emit(Event::FinishLoadingTools).await;
 
     let embedding_model = OpenAIEmbeddingModel {
         client: Client::with_config(
@@ -67,7 +87,7 @@ async fn main() {
         chat_repo: chat_repo.clone(),
         tools_repo: tools_repo.clone(),
         embedding_model: embedding_model.clone(),
-        event_processor: event_processor.clone(),
+        event_emitter: event_emitter.clone(),
         top_n_tools: config.top_n_tools,
         system_prompt: messages::SystemMessage {
             content: system_prompt,
@@ -86,7 +106,7 @@ async fn main() {
         llm,
         context_service,
         tools_repo: tools_repo.clone(),
-        event_processor: event_processor.clone(),
+        event_emitter: event_emitter.clone(),
     };
 
     let stt = OpenAISpeechToText {
@@ -109,6 +129,5 @@ async fn main() {
         chat_repo,
         last_chat_id_path: PathBuf::from("last_chat_id.txt"),
     };
-
     cli_runtime.run().await;
 }

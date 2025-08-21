@@ -13,14 +13,14 @@ use crate::{
         tools::Tool,
     },
     mcp::tools_repo::McpToolsRepo,
-    text::events::{Event, EventProcessor},
+    text::events::{Event, EventEmitter},
 };
 
 pub struct ContextService {
     pub chat_repo: Rc<ChatRepo>,
     pub tools_repo: Rc<McpToolsRepo>,
     pub embedding_model: Rc<OpenAIEmbeddingModel>,
-    pub event_processor: Rc<dyn EventProcessor>,
+    pub event_emitter: Rc<dyn EventEmitter>,
     pub system_prompt: messages::SystemMessage,
     pub top_n_tools: usize,
 }
@@ -68,13 +68,16 @@ impl ContextService {
         let tools = get_tools_result.value;
 
         for error in get_tools_result.errors {
-            self.event_processor
-                .process(Event::Error(error.into()))
-                .await;
+            self.event_emitter.emit(Event::Error(error.into())).await;
         }
 
-        self.most_relevant_tools(messages, &tools, self.top_n_tools)
-            .await
+        let tools = self
+            .most_relevant_tools(messages, &tools, self.top_n_tools)
+            .await?;
+
+        self.event_emitter.emit(Event::FilteredTools(tools.clone())).await;
+
+        Ok(tools)
     }
 
     async fn most_relevant_tools(
@@ -118,14 +121,6 @@ impl ContextService {
 
         distancies_with_tools
             .sort_unstable_by(|(distance, _), (other, _)| distance.total_cmp(other));
-
-        println!(
-            "{:#?}",
-            distancies_with_tools
-                .iter()
-                .map(|(d, t)| (d, t.name.clone()))
-                .collect::<Vec<_>>()
-        );
 
         let tools = distancies_with_tools
             .into_iter()
