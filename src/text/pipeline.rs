@@ -1,17 +1,21 @@
 use std::{collections::HashMap, rc::Rc};
 
-use uuid::Uuid;
-
 use crate::{
+    db::{chat_repo::ChatRepo, id::Id},
     domain::{
-        events::{Event, EventEmitter}, messages::{AssistantMessage, Message, ToolMessage, UserMessage}, tools::ToolCall
+        events::{Event, EventEmitter},
+        messages::{AssistantMessage, Message, ToolMessage, UserMessage},
+        tools::ToolCall,
     },
-    mcp::tools_repo::McpToolsRepo, openai::llm::OpenAILargeLanguageModel, text::context_service::ContextService,
+    mcp::tools_repo::McpToolsRepo,
+    openai::llm::OpenAILargeLanguageModel,
+    text::context_service::ContextService,
 };
 
 pub struct TextPipeline {
     pub llm: OpenAILargeLanguageModel,
     pub context_service: ContextService,
+    pub chat_repo: Rc<ChatRepo>,
     pub tools_repo: Rc<McpToolsRepo>,
     pub event_emitter: Rc<EventEmitter>,
 }
@@ -19,15 +23,16 @@ pub struct TextPipeline {
 impl TextPipeline {
     pub async fn answer_prompt(
         &self,
-        chat_id: Uuid,
+        chat_id: i64,
         user_prompt: String,
     ) -> anyhow::Result<Vec<AssistantMessage>> {
-        let user_message = UserMessage {
-            content: user_prompt + " /no_think",
-        };
-
-        self.context_service
-            .add_message(chat_id, &Message::User(user_message.clone()))
+        self.chat_repo
+            .add_message(
+                chat_id,
+                Message::User(UserMessage {
+                    content: user_prompt + " /no_think",
+                }),
+            )
             .await?;
 
         let mut responses: Vec<AssistantMessage> = vec![];
@@ -50,7 +55,7 @@ impl TextPipeline {
 
     pub async fn generate_new_assistant_message(
         &self,
-        chat_id: Uuid,
+        chat_id: Id,
         use_tools: bool,
     ) -> anyhow::Result<AssistantMessage> {
         let (history, tools) = if use_tools {
@@ -74,6 +79,11 @@ impl TextPipeline {
         self.event_emitter
             .emit(Event::ResponseTextChunk(assistant_message.content.clone()))
             .await;
+
+        self.chat_repo
+            .add_message(chat_id, Message::Assistant(assistant_message.clone()))
+            .await?;
+
         self.event_emitter.emit(Event::AssistantResponded).await;
 
         for tool_call_message in &assistant_message.tool_calls {
@@ -108,9 +118,9 @@ impl TextPipeline {
                     self.event_emitter
                         .emit(Event::ToolCallResult(tool_message.clone()))
                         .await;
-                    self.context_service
-                        .add_message(chat_id, &Message::Tool(tool_message))
-                        .await?
+                    self.chat_repo
+                        .add_message(chat_id, Message::Tool(tool_message))
+                        .await?;
                 }
                 Err(e) => {
                     self.event_emitter.emit(Event::Error(e.into())).await;

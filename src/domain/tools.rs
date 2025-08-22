@@ -40,7 +40,7 @@ impl From<Tool> for ChatCompletionTool {
                 name: tool.name,
                 description: Some(tool.description),
                 parameters: Some(Value::Object(tool.parameters)),
-                strict: None
+                strict: None,
             },
         }
     }
@@ -57,7 +57,7 @@ impl ToolCall {
     }
 }
 
-impl From<ToolCall> for CallToolRequestParam  {
+impl From<ToolCall> for CallToolRequestParam {
     fn from(tool_call: ToolCall) -> Self {
         Self {
             name: tool_call.name.into(),
@@ -65,4 +65,3 @@ impl From<ToolCall> for CallToolRequestParam  {
         }
     }
 }
-

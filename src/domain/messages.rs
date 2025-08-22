@@ -1,5 +1,10 @@
 use async_openai::types::{
-    ChatCompletionMessageToolCall, ChatCompletionRequestAssistantMessage, ChatCompletionRequestAssistantMessageContent, ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage, ChatCompletionRequestSystemMessageContent, ChatCompletionRequestToolMessage, ChatCompletionRequestToolMessageContent, ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageContent, CreateChatCompletionResponse, FunctionCall
+    ChatCompletionMessageToolCall, ChatCompletionRequestAssistantMessage,
+    ChatCompletionRequestAssistantMessageContent, ChatCompletionRequestMessage,
+    ChatCompletionRequestSystemMessage, ChatCompletionRequestSystemMessageContent,
+    ChatCompletionRequestToolMessage, ChatCompletionRequestToolMessageContent,
+    ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageContent,
+    CreateChatCompletionResponse, FunctionCall,
 };
 use rmcp::model::{CallToolResult, Content, RawContent, ResourceContents};
 use serde::{Deserialize, Serialize};
@@ -15,6 +20,36 @@ pub enum Message {
     User(UserMessage),
     Assistant(AssistantMessage),
     Tool(ToolMessage),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SystemMessage {
+    pub content: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct UserMessage {
+    pub content: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AssistantMessage {
+    pub content: String,
+    pub tool_calls: Vec<ToolCallMessage>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ToolMessage {
+    pub content: Vec<Content>,
+    pub tool_call_id: String,
+    pub is_error: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ToolCallMessage {
+    pub id: String,
+    pub name: String,
+    pub arguments: JsonObject,
 }
 
 impl Message {
@@ -47,36 +82,6 @@ impl Message {
             _ => false,
         }
     }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct SystemMessage {
-    pub content: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct UserMessage {
-    pub content: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AssistantMessage {
-    pub content: String,
-    pub tool_calls: Vec<ToolCallMessage>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ToolCallMessage {
-    pub id: String,
-    pub name: String,
-    pub arguments: JsonObject,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ToolMessage {
-    pub tool_call_id: String,
-    pub content: Vec<Content>,
-    pub is_error: bool,
 }
 
 impl ToolMessage {
@@ -193,11 +198,10 @@ impl From<ToolCallMessage> for ChatCompletionMessageToolCall {
             function: FunctionCall {
                 name: tool_call.name,
                 arguments: Value::Object(tool_call.arguments).to_string(),
-            }
+            },
         }
     }
 }
-
 
 impl TryFrom<ChatCompletionMessageToolCall> for ToolCallMessage {
     type Error = serde_json::Error;

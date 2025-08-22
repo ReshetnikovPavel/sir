@@ -104,6 +104,7 @@ async fn startup(tx: Sender<Event>) {
     let text_pipeline = TextPipeline {
         llm,
         context_service,
+        chat_repo: chat_repo.clone(),
         tools_repo: tools_repo.clone(),
         event_emitter: event_emitter.clone(),
     };

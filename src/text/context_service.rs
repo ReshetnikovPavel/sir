@@ -3,14 +3,16 @@ use std::rc::Rc;
 use async_openai::error::OpenAIError;
 use simsimd::{f16, SpatialSimilarity};
 use thiserror::Error;
-use uuid::Uuid;
 
 use crate::{
-    db::chat_repo::ChatRepo,
+    db::{chat_repo::ChatRepo, id::Id},
     domain::{
-        events::{Event, EventEmitter}, messages::{self, Message}, tools::Tool
+        events::{Event, EventEmitter},
+        messages::{self, Message},
+        tools::Tool,
     },
-    mcp::tools_repo::McpToolsRepo, openai::embedding_model::OpenAIEmbeddingModel,
+    mcp::tools_repo::McpToolsRepo,
+    openai::embedding_model::OpenAIEmbeddingModel,
 };
 
 pub struct ContextService {
@@ -23,19 +25,14 @@ pub struct ContextService {
 }
 
 impl ContextService {
-    pub async fn add_message(&self, chat_id: Uuid, message: &Message) -> Result<(), Error> {
-        self.chat_repo.add_message(chat_id, message).await?;
-        Ok(())
-    }
-
-    pub async fn context(&self, chat_id: Uuid) -> Result<(Vec<Message>, Vec<Tool>), Error> {
+    pub async fn context(&self, chat_id: Id) -> Result<(Vec<Message>, Vec<Tool>), Error> {
         let history = self.history(chat_id).await?;
         let tools = self.tools(&history).await?;
 
         Ok((history, tools))
     }
 
-    pub async fn history(&self, chat_id: Uuid) -> Result<Vec<Message>, Error> {
+    pub async fn history(&self, chat_id: Id) -> Result<Vec<Message>, Error> {
         let system_message = Message::System(self.system_prompt.clone());
         let chat = self.chat_repo.get_messages(chat_id).await?;
         let chat = self.without_old_tool_calls(chat);
@@ -72,7 +69,9 @@ impl ContextService {
             .most_relevant_tools(messages, &tools, self.top_n_tools)
             .await?;
 
-        self.event_emitter.emit(Event::FilteredTools(tools.clone())).await;
+        self.event_emitter
+            .emit(Event::FilteredTools(tools.clone()))
+            .await;
 
         Ok(tools)
     }

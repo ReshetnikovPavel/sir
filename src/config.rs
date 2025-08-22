@@ -1,10 +1,7 @@
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Deserializer};
 
-use crate::{
-    audio::config::AudioConfig, text::config::ChatConfig,
-    mcp::config::McpConfig,
-};
+use crate::{audio::config::AudioConfig, mcp::config::McpConfig, text::config::ChatConfig};
 
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -33,8 +30,9 @@ where
     let secret = SecretString::deserialize(deserializer)?;
     let value = secret.expose_secret();
     if let Some(value) = value.strip_prefix('$') {
-        Ok(SecretString::from(std::env::var(value).unwrap_or_else(|_| panic!("Environment variable {} must be set",
-            value))))
+        Ok(SecretString::from(std::env::var(value).unwrap_or_else(
+            |_| panic!("Environment variable {} must be set", value),
+        )))
     } else {
         Ok(secret)
     }

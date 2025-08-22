@@ -4,8 +4,10 @@ use simple_stopwatch::Stopwatch;
 use tokio::sync::mpsc::Receiver;
 
 use crate::domain::{
-        events::Event, messages::{ToolCallMessage, ToolMessage}, tools::Tool
-    };
+    events::Event,
+    messages::{ToolCallMessage, ToolMessage},
+    tools::Tool,
+};
 
 pub struct CliEventProcessor {
     pub rx: Receiver<Event>,

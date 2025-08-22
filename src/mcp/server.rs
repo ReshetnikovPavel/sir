@@ -1,4 +1,8 @@
-use std::{fs::{self, OpenOptions}, io, process::Stdio};
+use std::{
+    fs::{self, OpenOptions},
+    io,
+    process::Stdio,
+};
 use thiserror::Error;
 
 use rmcp::{service::RunningService, transport::sse::SseTransportError, RoleClient, ServiceExt};

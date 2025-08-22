@@ -10,6 +10,7 @@ pub struct OpenAIEmbeddingModel {
 }
 
 impl OpenAIEmbeddingModel {
+    #[allow(dead_code)]
     pub async fn get_embedding(&self, input: String) -> Result<Vec<f32>, OpenAIError> {
         let request = CreateEmbeddingRequest {
             model: self.model.clone(),

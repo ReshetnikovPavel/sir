@@ -2,13 +2,14 @@ use std::{
     fs::{self, read_to_string},
     io::{self, Write},
     path::PathBuf,
-    rc::Rc, time::Duration,
+    rc::Rc,
+    time::Duration,
 };
 
-use uuid::Uuid;
-
 use crate::{
-    audio::audio_service::AudioService, db::chat_repo::ChatRepo, text::pipeline::TextPipeline, // text::pipeline::TextPipeline,
+    audio::audio_service::AudioService,
+    db::{chat_repo::ChatRepo, id::Id},
+    text::pipeline::TextPipeline,
 };
 
 pub struct CliRuntime {
@@ -49,10 +50,10 @@ impl CliRuntime {
         }
     }
 
-    async fn get_chat_id(&self) -> Uuid {
-        match read_to_string(&self.last_chat_id_path) {
-            Ok(id) => Uuid::parse_str(id.trim()).unwrap(),
-            Err(_) => {
+    async fn get_chat_id(&self) -> Id {
+        match read_to_string(&self.last_chat_id_path).map(|id| id.trim().parse::<Id>()) {
+            Ok(Ok(id)) => id,
+            Err(_) | Ok(Err(_)) => {
                 let id = self.chat_repo.new_chat().await.unwrap();
                 fs::write(&self.last_chat_id_path, id.to_string()).unwrap();
                 id
