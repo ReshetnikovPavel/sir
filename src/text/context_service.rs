@@ -6,14 +6,11 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::{
-    context::openai_embedding_model::OpenAIEmbeddingModel,
     db::chat_repo::ChatRepo,
-    entities::{
-        messages::{self, Message},
-        tools::Tool,
+    domain::{
+        events::{Event, EventEmitter}, messages::{self, Message}, tools::Tool
     },
-    mcp::tools_repo::McpToolsRepo,
-    text::events::{Event, EventEmitter},
+    mcp::tools_repo::McpToolsRepo, openai::embedding_model::OpenAIEmbeddingModel,
 };
 
 pub struct ContextService {

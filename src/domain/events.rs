@@ -1,6 +1,6 @@
 use tokio::sync::mpsc::Sender;
 
-use crate::entities::{
+use crate::domain::{
     messages::{ToolCallMessage, ToolMessage},
     tools::Tool,
 };

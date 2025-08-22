@@ -1,4 +1,3 @@
 pub mod config;
-pub mod events;
+pub mod context_service;
 pub mod pipeline;
-pub mod openai_llm;

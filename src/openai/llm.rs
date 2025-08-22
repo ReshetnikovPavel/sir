@@ -5,7 +5,7 @@ use async_openai::{
     Client,
 };
 
-use crate::entities::{
+use crate::domain::{
     messages::{AssistantMessage, Message},
     tools::Tool,
 };

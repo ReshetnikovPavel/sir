@@ -5,7 +5,7 @@ use rmcp::model::{CallToolResult, Content, RawContent, ResourceContents};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::entities::json::JsonObject;
+use crate::domain::json::JsonObject;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "role")]

@@ -8,9 +8,9 @@ use tokio_stream::StreamExt as _;
 
 use voice_activity_detector_silero_v5::{StreamExt as _, VoiceActivityDetector};
 
-use crate::audio::{
-    openai_stt::OpenAISpeechToText,
-    recording::{self, Recording},
+use crate::{
+    audio::recording::{self, Recording},
+    openai::stt::OpenAISpeechToText,
 };
 
 pub struct AudioService {

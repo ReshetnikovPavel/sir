@@ -3,16 +3,10 @@ use std::{collections::HashMap, rc::Rc};
 use uuid::Uuid;
 
 use crate::{
-    context::context_service::ContextService,
-    entities::{
-        messages::{AssistantMessage, Message, ToolMessage, UserMessage},
-        tools::ToolCall,
+    domain::{
+        events::{Event, EventEmitter}, messages::{AssistantMessage, Message, ToolMessage, UserMessage}, tools::ToolCall
     },
-    mcp::tools_repo::McpToolsRepo,
-    text::{
-        events::{Event, EventEmitter},
-        openai_llm::OpenAILargeLanguageModel,
-    },
+    mcp::tools_repo::McpToolsRepo, openai::llm::OpenAILargeLanguageModel, text::context_service::ContextService,
 };
 
 pub struct TextPipeline {
@@ -80,9 +74,7 @@ impl TextPipeline {
         self.event_emitter
             .emit(Event::ResponseTextChunk(assistant_message.content.clone()))
             .await;
-        self.event_emitter
-            .emit(Event::AssistantResponded)
-            .await;
+        self.event_emitter.emit(Event::AssistantResponded).await;
 
         for tool_call_message in &assistant_message.tool_calls {
             self.event_emitter

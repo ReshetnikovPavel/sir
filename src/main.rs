@@ -1,33 +1,32 @@
+use crate::audio::audio_service::AudioService;
+use crate::domain::events::EventEmitter;
+use crate::domain::messages;
+use crate::openai::embedding_model::OpenAIEmbeddingModel;
+use crate::openai::llm::OpenAILargeLanguageModel;
+use crate::openai::stt::OpenAISpeechToText;
+use crate::{domain::events::Event, text::context_service::ContextService};
 use std::{collections::HashMap, fs::read_to_string, path::PathBuf, rc::Rc, thread};
 
 use async_openai::{config::OpenAIConfig, Client};
 use config::Config;
-use context::context_service::ContextService;
 use dotenv::dotenv;
 use mcp::tools_repo::McpToolsRepo;
 use secrecy::ExposeSecret;
 use tokio::sync::mpsc::{self, Sender};
 
 use crate::{
-    audio::{audio_service::AudioService, openai_stt::OpenAISpeechToText},
     cli::{event_processor::CliEventProcessor, runtime::CliRuntime},
-    context::openai_embedding_model::OpenAIEmbeddingModel,
     db::chat_repo::ChatRepo,
-    entities::messages,
-    text::{
-        events::{Event, EventEmitter},
-        openai_llm::OpenAILargeLanguageModel,
-        pipeline::TextPipeline,
-    },
+    text::pipeline::TextPipeline,
 };
 
 mod audio;
 mod cli;
 mod config;
-mod context;
 mod db;
-mod entities;
+mod domain;
 mod mcp;
+mod openai;
 mod text;
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 8)]

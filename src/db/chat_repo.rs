@@ -3,7 +3,7 @@ use std::rc::Rc;
 use libsql::{params, Connection};
 use uuid::Uuid;
 
-use crate::entities::messages::Message;
+use crate::domain::messages::Message;
 
 pub struct ChatRepo {
     conn: Rc<Connection>,

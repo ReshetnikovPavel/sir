@@ -6,7 +6,7 @@ use rmcp::{
 };
 
 use crate::{
-    entities::tools::{Tool, ToolCall},
+    domain::tools::{Tool, ToolCall},
     mcp,
 };
 

@@ -3,13 +3,9 @@ use std::collections::HashMap;
 use simple_stopwatch::Stopwatch;
 use tokio::sync::mpsc::Receiver;
 
-use crate::{
-    entities::{
-        messages::{ToolCallMessage, ToolMessage},
-        tools::Tool,
-    },
-    text::events::Event,
-};
+use crate::domain::{
+        events::Event, messages::{ToolCallMessage, ToolMessage}, tools::Tool
+    };
 
 pub struct CliEventProcessor {
     pub rx: Receiver<Event>,

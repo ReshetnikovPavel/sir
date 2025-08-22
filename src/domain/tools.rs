@@ -3,7 +3,7 @@ use rmcp::{self, model::CallToolRequestParam};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::entities::{json::JsonObject, messages::ToolCallMessage};
+use crate::domain::{json::JsonObject, messages::ToolCallMessage};
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Tool {
