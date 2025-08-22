@@ -5,6 +5,26 @@ use uuid::Uuid;
 
 use crate::domain::messages::Message;
 
+pub async fn create_tables(conn: &Connection) -> Result<(), libsql::Error> {
+    let create_chat_table = "
+        CREATE TABLE IF NOT EXISTS chats (
+        id BLOB PRIMARY KEY NOT NULL
+    );";
+    conn.execute(create_chat_table, ()).await?;
+
+    let create_message_table = "
+        CREATE TABLE IF NOT EXISTS messages (
+        id BLOB PRIMARY KEY NOT NULL,
+        chat_id BLOB NOT NULL,
+        role TEXT NOT NULL CHECK(role IN ('system', 'user', 'assistant', 'tool', 'function')),
+        content TEXT NOT NULL,
+        FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
+    );";
+    conn.execute(create_message_table, ()).await?;
+
+    Ok(())
+}
+
 pub struct ChatRepo {
     conn: Rc<Connection>,
 }
@@ -18,12 +38,10 @@ impl ChatRepo {
     pub async fn new_chat(&self) -> Result<Uuid, libsql::Error> {
         let id = Uuid::now_v7();
 
-        self.conn
-            .execute(
-                "INSERT INTO chats(id) VALUES(?1)",
-                params![id.into_bytes().as_slice()],
-            )
-            .await?;
+        let insert_chat = "INSERT INTO chats(id) VALUES(?1)";
+        let params = params![id.into_bytes().as_slice()];
+        self.conn.execute(insert_chat, params).await?;
+
         Ok(id)
     }
 
@@ -36,31 +54,23 @@ impl ChatRepo {
         let message_json = serde_json::to_value(message).unwrap();
         let role = message_json.get("role").unwrap().as_str().unwrap();
 
-        self.conn
-            .execute(
-                "INSERT INTO messages(id, chat_id, role, content) VALUES (?1, ?2, ?3, ?4)",
-                params![
-                    id.into_bytes().as_slice(),
-                    chat_id.into_bytes().as_slice(),
-                    role,
-                    message_json.to_string()
-                ],
-            )
-            .await?;
+        let insert_message =
+            "INSERT INTO messages(id, chat_id, role, content) VALUES (?1, ?2, ?3, ?4)";
+        let params = params![
+            id.into_bytes().as_slice(),
+            chat_id.into_bytes().as_slice(),
+            role,
+            message_json.to_string()
+        ];
+        self.conn.execute(insert_message, params).await?;
+
         Ok(id)
     }
 
-    pub async fn get_messages(
-        &self,
-        chat_id: Uuid,
-    ) -> Result<Vec<Message>, libsql::Error> {
-        let mut rows = self
-            .conn
-            .query(
-                "SELECT content FROM messages WHERE chat_id = ?1",
-                params![chat_id.into_bytes().as_slice()],
-            )
-            .await?;
+    pub async fn get_messages(&self, chat_id: Uuid) -> Result<Vec<Message>, libsql::Error> {
+        let select_messages = "SELECT content FROM messages WHERE chat_id = ?1";
+        let params = params![chat_id.into_bytes().as_slice()];
+        let mut rows = self.conn.query(select_messages, params).await?;
 
         let mut messages = vec![];
         while let Some(row) = rows.next().await? {
@@ -68,24 +78,4 @@ impl ChatRepo {
         }
         Ok(messages)
     }
-}
-
-static CREATE_CHAT_TABLE: &str = "
-    CREATE TABLE IF NOT EXISTS chats (
-    id BLOB PRIMARY KEY NOT NULL
-);";
-
-static CREATE_MESSAGE_TABLE: &str = "
-    CREATE TABLE IF NOT EXISTS messages (
-    id BLOB PRIMARY KEY NOT NULL,
-    chat_id BLOB NOT NULL,
-    role TEXT NOT NULL CHECK(role IN ('system', 'user', 'assistant', 'tool', 'function')),
-    content TEXT NOT NULL,
-    FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
-);";
-
-pub async fn create_tables(conn: &Connection) -> Result<(), libsql::Error> {
-    conn.execute(CREATE_CHAT_TABLE, ()).await?;
-    conn.execute(CREATE_MESSAGE_TABLE, ()).await?;
-    Ok(())
 }

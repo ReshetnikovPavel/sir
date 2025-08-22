@@ -87,7 +87,7 @@ async fn startup(tx: Sender<Event>) {
         tools_repo: tools_repo.clone(),
         embedding_model: embedding_model.clone(),
         event_emitter: event_emitter.clone(),
-        top_n_tools: config.top_n_tools,
+        top_n_tools: config.chat.top_n_tools,
         system_prompt: messages::SystemMessage {
             content: system_prompt,
         },
