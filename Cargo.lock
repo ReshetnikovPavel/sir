@@ -3021,8 +3021,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-openai",
- "async-trait",
- "chrono",
  "cpal",
  "dotenv",
  "duration-str",
@@ -3042,7 +3040,6 @@ dependencies = [
  "thiserror 2.0.16",
  "tokio",
  "tokio-stream",
- "uuid",
  "voice_activity_detector_silero_v5",
 ]
 
