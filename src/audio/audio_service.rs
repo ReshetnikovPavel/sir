@@ -43,7 +43,7 @@ impl AudioService {
         let transcription = self.stt.transcribe(buf).await?;
         println!("Trascribed::: {}", transcription);
 
-        return Ok(transcription);
+        Ok(transcription)
     }
 
     async fn is_speech(&self) -> Result<bool, Error> {

@@ -33,12 +33,9 @@ where
 {
     let secret = SecretString::deserialize(deserializer)?;
     let value = secret.expose_secret();
-    if value.starts_with('$') {
-        let value = &value[1..];
-        Ok(SecretString::from(std::env::var(value).expect(&format!(
-            "Environment variable {} must be set",
-            value
-        ))))
+    if let Some(value) = value.strip_prefix('$') {
+        Ok(SecretString::from(std::env::var(value).unwrap_or_else(|_| panic!("Environment variable {} must be set",
+            value))))
     } else {
         Ok(secret)
     }

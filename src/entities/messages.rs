@@ -19,31 +19,19 @@ pub enum Message {
 
 impl Message {
     pub fn is_system(&self) -> bool {
-        match self {
-            Message::System(_) => true,
-            _ => false,
-        }
+        matches!(self, Message::System(_))
     }
 
     pub fn is_user(&self) -> bool {
-        match self {
-            Message::User(_) => true,
-            _ => false,
-        }
+        matches!(self, Message::User(_))
     }
 
     pub fn is_assistant(&self) -> bool {
-        match self {
-            Message::Assistant(_) => true,
-            _ => false,
-        }
+        matches!(self, Message::Assistant(_))
     }
 
     pub fn is_tool(&self) -> bool {
-        match self {
-            Message::Tool(_) => true,
-            _ => false,
-        }
+        matches!(self, Message::Tool(_))
     }
 
     pub fn is_assistant_with_tool_call(&self) -> bool {

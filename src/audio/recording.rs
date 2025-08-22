@@ -31,7 +31,7 @@ impl Recording {
             config = SupportedStreamConfig::new(
                 1,
                 cpal::SampleRate(16000),
-                config.buffer_size().clone(),
+                *config.buffer_size(),
                 cpal::SampleFormat::I16,
             );
         }

@@ -70,12 +70,12 @@ impl ChatRepo {
     }
 }
 
-static CREATE_CHAT_TABLE: &'static str = "
+static CREATE_CHAT_TABLE: &str = "
     CREATE TABLE IF NOT EXISTS chats (
     id BLOB PRIMARY KEY NOT NULL
 );";
 
-static CREATE_MESSAGE_TABLE: &'static str = "
+static CREATE_MESSAGE_TABLE: &str = "
     CREATE TABLE IF NOT EXISTS messages (
     id BLOB PRIMARY KEY NOT NULL,
     chat_id BLOB NOT NULL,

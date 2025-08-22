@@ -58,7 +58,7 @@ impl ContextService {
         let after_latest_tool = messages.split_off(user);
         messages
             .into_iter()
-            .filter(|m| !Message::is_tool(&m) && !Message::is_assistant_with_tool_call(&m))
+            .filter(|m| !Message::is_tool(m) && !Message::is_assistant_with_tool_call(m))
             .chain(after_latest_tool)
             .collect()
     }
@@ -108,7 +108,7 @@ impl ContextService {
             .get_embeddings(texts)
             .await?
             .into_iter()
-            .map(|embedding| embedding.into_iter().map(|x| f16::from_f32(x)).collect());
+            .map(|embedding| embedding.into_iter().map(f16::from_f32).collect());
 
         let message_embedding = embeddings.next().unwrap();
         let tool_embeddings = embeddings.collect::<Vec<Vec<f16>>>();
@@ -135,9 +135,9 @@ impl ContextService {
 #[derive(Error, Debug)]
 pub enum Error {
     #[error(transparent)]
-    SQL(#[from] libsql::Error),
+    Sql(#[from] libsql::Error),
     #[error(transparent)]
-    MCP(#[from] rmcp::ServiceError),
+    Mcp(#[from] rmcp::ServiceError),
     #[error(transparent)]
     OpenAI(#[from] OpenAIError),
 }
