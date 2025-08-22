@@ -19,7 +19,7 @@ pub struct TextPipeline {
     pub llm: OpenAILargeLanguageModel,
     pub context_service: ContextService,
     pub tools_repo: Rc<McpToolsRepo>,
-    pub event_emitter: Rc<dyn EventEmitter>,
+    pub event_emitter: Rc<EventEmitter>,
 }
 
 impl TextPipeline {

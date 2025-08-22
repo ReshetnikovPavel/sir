@@ -1,28 +1,15 @@
 use std::collections::HashMap;
 
-use async_trait::async_trait;
 use simple_stopwatch::Stopwatch;
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::Receiver;
 
 use crate::{
-    entities::{messages::{ToolCallMessage, ToolMessage}, tools::Tool},
-    text::events::{Event, EventEmitter},
+    entities::{
+        messages::{ToolCallMessage, ToolMessage},
+        tools::Tool,
+    },
+    text::events::Event,
 };
-
-pub struct MpscEventEmitter {
-    pub tx: Sender<Event>,
-}
-
-#[async_trait]
-impl EventEmitter for MpscEventEmitter {
-    async fn emit(&self, event: Event) {
-        let result = self.tx.send(event).await;
-        match result {
-            Ok(_) => {}
-            Err(e) => log::error!("{:#?}", e),
-        }
-    }
-}
 
 pub struct CliEventProcessor {
     pub rx: Receiver<Event>,
@@ -63,8 +50,8 @@ impl CliEventProcessor {
 
     fn assistant_responeded(&mut self) {
         let stopwatch_key = "assistant_response";
-        self.stop_stopwatch(stopwatch_key);
         println!();
+        self.stop_stopwatch(stopwatch_key);
     }
 
     fn tool_call(&mut self, tool_call_message: ToolCallMessage) {
@@ -104,7 +91,11 @@ impl CliEventProcessor {
     }
 
     fn filtered_tools(&mut self, tools: Vec<Tool>) {
-        let tools = tools.into_iter().map(|t| format!("`{}`", t.name)).collect::<Vec<_>>().join(", ");
+        let tools = tools
+            .into_iter()
+            .map(|t| format!("`{}`", t.name))
+            .collect::<Vec<_>>()
+            .join(", ");
         println!("Filtered tools: {}", tools)
     }
 }

@@ -10,10 +10,7 @@ use tokio::sync::mpsc::{self, Sender};
 
 use crate::{
     audio::{audio_service::AudioService, openai_stt::OpenAISpeechToText},
-    cli::{
-        event_processor::{CliEventProcessor, MpscEventEmitter},
-        runtime::CliRuntime,
-    },
+    cli::{event_processor::CliEventProcessor, runtime::CliRuntime},
     context::openai_embedding_model::OpenAIEmbeddingModel,
     db::chat_repo::ChatRepo,
     entities::messages,
@@ -39,7 +36,10 @@ async fn main() {
     env_logger::init();
 
     let (tx, rx) = mpsc::channel::<Event>(128);
-    let mut event_processor = CliEventProcessor { rx, stopwatches: HashMap::new() };
+    let mut event_processor = CliEventProcessor {
+        rx,
+        stopwatches: HashMap::new(),
+    };
     let event_processor_handle = thread::spawn(async move || {
         event_processor.run().await;
     });
@@ -48,7 +48,7 @@ async fn main() {
 }
 
 async fn startup(tx: Sender<Event>) {
-    let event_emitter = Rc::new(MpscEventEmitter { tx });
+    let event_emitter = Rc::new(EventEmitter { tx });
     let config = Config::load("config.json").await;
 
     let db = libsql::Builder::new_local("sir.db")

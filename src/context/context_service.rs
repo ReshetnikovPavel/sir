@@ -20,7 +20,7 @@ pub struct ContextService {
     pub chat_repo: Rc<ChatRepo>,
     pub tools_repo: Rc<McpToolsRepo>,
     pub embedding_model: Rc<OpenAIEmbeddingModel>,
-    pub event_emitter: Rc<dyn EventEmitter>,
+    pub event_emitter: Rc<EventEmitter>,
     pub system_prompt: messages::SystemMessage,
     pub top_n_tools: usize,
 }

@@ -1,6 +1,9 @@
-use async_trait::async_trait;
+use tokio::sync::mpsc::Sender;
 
-use crate::entities::{messages::{ToolCallMessage, ToolMessage}, tools::Tool};
+use crate::entities::{
+    messages::{ToolCallMessage, ToolMessage},
+    tools::Tool,
+};
 
 pub enum Event {
     Error(anyhow::Error),
@@ -11,10 +14,17 @@ pub enum Event {
     AssistantResponded,
     StartLoadingTools,
     FinishLoadingTools,
-    FilteredTools(Vec<Tool>)
+    FilteredTools(Vec<Tool>),
 }
 
-#[async_trait]
-pub trait EventEmitter {
-    async fn emit(&self, event: Event);
+pub struct EventEmitter {
+    pub tx: Sender<Event>,
+}
+
+impl EventEmitter {
+    pub async fn emit(&self, event: Event) {
+        if let Err(e) = self.tx.send(event).await {
+            log::error!("{:#?}", e)
+        }
+    }
 }
