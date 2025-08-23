@@ -31,6 +31,7 @@ impl CliEventProcessor {
             Event::AssistantResponded => self.assistant_responeded(),
             Event::StartLoadingTools => self.start_loading_tools(),
             Event::FinishLoadingTools => self.finish_loading_tools(),
+            Event::StartFliteringTools => self.start_filtering_tools(),
             Event::FilteredTools(tools) => self.filtered_tools(tools),
             Event::RequestedAssistant => self.requested_assistant(),
         }
@@ -65,15 +66,34 @@ impl CliEventProcessor {
     }
 
     fn start_loading_tools(&mut self) {
-        let stopwatch_key = "loading_tools";
+        let stopwatch_key = "load_tools";
         self.stopwatches
             .insert(stopwatch_key.to_string(), Stopwatch::start_new());
         println!("Loading tools");
     }
 
     fn finish_loading_tools(&mut self) {
-        let stopwatch_key = "loading_tools";
+        let stopwatch_key = "load_tools";
         self.stop_stopwatch(stopwatch_key);
+    }
+
+    fn start_filtering_tools(&mut self) {
+        let stopwatch_key = "filter_tools";
+        self.stopwatches
+            .insert(stopwatch_key.to_string(), Stopwatch::start_new());
+        println!("Filtering tools");
+    }
+
+    fn filtered_tools(&mut self, tools: Vec<Tool>) {
+        let stopwatch_key = "filter_tools";
+        self.stop_stopwatch(stopwatch_key);
+
+        let tools = tools
+            .into_iter()
+            .map(|t| format!("`{}`", t.name))
+            .collect::<Vec<_>>()
+            .join(", ");
+        println!("Filtered tools: {}", tools)
     }
 
     fn stop_stopwatch(&mut self, key: &str) {
@@ -86,14 +106,5 @@ impl CliEventProcessor {
                 log::error!("Stopwatch `{}` wasn't started", key);
             }
         }
-    }
-
-    fn filtered_tools(&mut self, tools: Vec<Tool>) {
-        let tools = tools
-            .into_iter()
-            .map(|t| format!("`{}`", t.name))
-            .collect::<Vec<_>>()
-            .join(", ");
-        println!("Filtered tools: {}", tools)
     }
 }

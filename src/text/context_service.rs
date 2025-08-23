@@ -58,6 +58,8 @@ impl ContextService {
     }
 
     async fn tools(&self, messages: &[Message]) -> Result<Vec<Tool>, Error> {
+        self.event_emitter.emit(Event::StartFliteringTools).await;
+
         let get_tools_result = self.tools_repo.tools().await;
         let tools = get_tools_result.value;
 

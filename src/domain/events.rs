@@ -14,6 +14,7 @@ pub enum Event {
     AssistantResponded,
     StartLoadingTools,
     FinishLoadingTools,
+    StartFliteringTools,
     FilteredTools(Vec<Tool>),
 }
 
