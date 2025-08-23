@@ -1,0 +1,82 @@
+use std::rc::Rc;
+
+use async_openai::error::OpenAIError;
+use simsimd::SpatialSimilarity as _;
+
+use crate::{
+    domain::{messages::Message, tools::Tool},
+    openai::embedding_model::OpenAIEmbeddingModel,
+};
+
+pub struct ToolsRag {
+    embedding_model: Rc<OpenAIEmbeddingModel>,
+    tools: Vec<Tool>,
+    tool_embeddings: Vec<Vec<simsimd::f16>>,
+}
+
+impl ToolsRag {
+    pub async fn new(
+        embedding_model: Rc<OpenAIEmbeddingModel>,
+        tools: Vec<Tool>,
+    ) -> Result<Self, OpenAIError> {
+        let tool_texts = tools
+            .iter()
+            .map(|tool| format!("{}\n{}", tool.name, tool.description))
+            .collect();
+
+        let tool_embeddings = embedding_model
+            .get_embeddings(tool_texts)
+            .await?
+            .into_iter()
+            .map(|emb| emb.into_iter().map(simsimd::f16::from_f32).collect())
+            .collect();
+
+        Ok(Self {
+            embedding_model,
+            tools,
+            tool_embeddings,
+        })
+    }
+
+    pub async fn tools(
+        &self,
+        messages: &[Message],
+        top_n: usize,
+    ) -> Result<Vec<Tool>, OpenAIError> {
+        let messages_text = messages[messages.len().saturating_sub(3)..]
+            .iter()
+            .filter(|m| m.is_user() || m.is_assistant_without_tool_call())
+            .map(|m| match m {
+                Message::User(user_message) => user_message.content.clone(),
+                Message::Assistant(assistant_message) => assistant_message.content.clone(),
+                _ => unreachable!(),
+            } + "\n")
+            .collect::<String>();
+
+        let message_embedding = self
+            .embedding_model
+            .get_embedding(messages_text)
+            .await?
+            .into_iter()
+            .map(simsimd::f16::from_f32)
+            .collect::<Vec<_>>();
+
+        let mut distancies_with_tools = self
+            .tool_embeddings
+            .iter()
+            .map(|tool_embedding| simsimd::f16::cos(&message_embedding, tool_embedding).unwrap())
+            .zip(self.tools.iter())
+            .collect::<Vec<_>>();
+
+        distancies_with_tools
+            .sort_unstable_by(|(distance, _), (other, _)| distance.total_cmp(other));
+
+        let tools = distancies_with_tools
+            .into_iter()
+            .map(|(_, tool)| tool.clone())
+            .take(top_n)
+            .collect::<Vec<_>>();
+
+        Ok(tools)
+    }
+}

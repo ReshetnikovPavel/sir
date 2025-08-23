@@ -1,8 +1,10 @@
 use crate::audio::audio_service::AudioService;
 use crate::domain::events::EventEmitter;
+use crate::domain::messages::{Message, SystemMessage};
 use crate::openai::embedding_model::OpenAIEmbeddingModel;
 use crate::openai::llm::OpenAILargeLanguageModel;
 use crate::openai::stt::OpenAISpeechToText;
+use crate::rag::tools_rag::ToolsRag;
 use crate::{domain::events::Event, text::context_service::ContextService};
 use std::{collections::HashMap, fs::read_to_string, path::PathBuf, rc::Rc, thread};
 
@@ -26,6 +28,7 @@ mod db;
 mod domain;
 mod mcp;
 mod openai;
+mod rag;
 mod text;
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 8)]
@@ -78,19 +81,25 @@ async fn startup(tx: Sender<Event>) {
     };
     let embedding_model = Rc::new(embedding_model);
 
+    let tools_result = tools_repo.tools().await;
+    let tools = tools_result.value;
+    for error in tools_result.errors {
+        event_emitter.emit(Event::Error(error.into())).await;
+    }
+    let tools_rag = ToolsRag::new(embedding_model.clone(), tools).await.unwrap();
+
     let system_prompt =
         read_to_string(config.chat.system_prompt_path).expect("System prompt file does not exist");
 
-    let context_service = ContextService::new(
-        chat_repo.clone(),
-        tools_repo.clone(),
-        embedding_model.clone(),
-        event_emitter.clone(),
-        system_prompt,
-        config.chat.top_n_tools,
-    )
-    .await
-    .unwrap();
+    let context_service = ContextService {
+        tools_rag,
+        chat_repo: chat_repo.clone(),
+        system_prompt: Message::System(SystemMessage {
+            content: system_prompt,
+        }),
+        event_emitter: event_emitter.clone(),
+        top_n_tools: config.chat.top_n_tools,
+    };
 
     let llm = OpenAILargeLanguageModel {
         client: Client::with_config(
