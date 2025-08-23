@@ -1,6 +1,5 @@
 use crate::audio::audio_service::AudioService;
 use crate::domain::events::EventEmitter;
-use crate::domain::messages;
 use crate::openai::embedding_model::OpenAIEmbeddingModel;
 use crate::openai::llm::OpenAILargeLanguageModel;
 use crate::openai::stt::OpenAISpeechToText;
@@ -82,16 +81,16 @@ async fn startup(tx: Sender<Event>) {
     let system_prompt =
         read_to_string(config.chat.system_prompt_path).expect("System prompt file does not exist");
 
-    let context_service = ContextService {
-        chat_repo: chat_repo.clone(),
-        tools_repo: tools_repo.clone(),
-        embedding_model: embedding_model.clone(),
-        event_emitter: event_emitter.clone(),
-        top_n_tools: config.chat.top_n_tools,
-        system_prompt: messages::SystemMessage {
-            content: system_prompt,
-        },
-    };
+    let context_service = ContextService::new(
+        chat_repo.clone(),
+        tools_repo.clone(),
+        embedding_model.clone(),
+        event_emitter.clone(),
+        system_prompt,
+        config.chat.top_n_tools,
+    )
+    .await
+    .unwrap();
 
     let llm = OpenAILargeLanguageModel {
         client: Client::with_config(

@@ -5,7 +5,7 @@ use serde_json::Value;
 
 use crate::domain::{json::JsonObject, messages::ToolCallMessage};
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Hash, PartialEq, Eq)]
 pub struct Tool {
     pub name: String,
     pub description: String,

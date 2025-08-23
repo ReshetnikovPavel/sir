@@ -8,7 +8,7 @@ use crate::{
     db::{chat_repo::ChatRepo, id::Id},
     domain::{
         events::{Event, EventEmitter},
-        messages::{self, Message},
+        messages::{Message, SystemMessage},
         tools::Tool,
     },
     mcp::tools_repo::McpToolsRepo,
@@ -16,15 +16,55 @@ use crate::{
 };
 
 pub struct ContextService {
-    pub chat_repo: Rc<ChatRepo>,
-    pub tools_repo: Rc<McpToolsRepo>,
-    pub embedding_model: Rc<OpenAIEmbeddingModel>,
-    pub event_emitter: Rc<EventEmitter>,
-    pub system_prompt: messages::SystemMessage,
-    pub top_n_tools: usize,
+    chat_repo: Rc<ChatRepo>,
+    embedding_model: Rc<OpenAIEmbeddingModel>,
+    event_emitter: Rc<EventEmitter>,
+    system_prompt: Message,
+    top_n_tools: usize,
+    tools: Vec<Tool>,
+    tool_embeddings: Vec<Vec<simsimd::f16>>,
 }
 
 impl ContextService {
+    pub async fn new(
+        chat_repo: Rc<ChatRepo>,
+        tools_repo: Rc<McpToolsRepo>,
+        embedding_model: Rc<OpenAIEmbeddingModel>,
+        event_emitter: Rc<EventEmitter>,
+        system_prompt: String,
+        top_n_tools: usize,
+    ) -> Result<Self, Error> {
+        let result = tools_repo.tools().await;
+        let tools = result.value;
+        for error in result.errors {
+            event_emitter.emit(Event::Error(error.into())).await;
+        }
+
+        let tool_texts = tools
+            .iter()
+            .map(|tool| format!("{}\n{}", tool.name, tool.description))
+            .collect();
+
+        let tool_embeddings = embedding_model
+            .get_embeddings(tool_texts)
+            .await?
+            .into_iter()
+            .map(|emb| emb.into_iter().map(f16::from_f32).collect())
+            .collect();
+
+        Ok(Self {
+            chat_repo,
+            embedding_model,
+            event_emitter,
+            system_prompt: Message::System(SystemMessage {
+                content: system_prompt,
+            }),
+            top_n_tools,
+            tools,
+            tool_embeddings,
+        })
+    }
+
     pub async fn context(&self, chat_id: Id) -> Result<(Vec<Message>, Vec<Tool>), Error> {
         let history = self.history(chat_id).await?;
         let tools = self.tools(&history).await?;
@@ -33,7 +73,7 @@ impl ContextService {
     }
 
     pub async fn history(&self, chat_id: Id) -> Result<Vec<Message>, Error> {
-        let system_message = Message::System(self.system_prompt.clone());
+        let system_message = self.system_prompt.clone();
         let chat = self.chat_repo.get_messages(chat_id).await?;
         let chat = self.without_old_tool_calls(chat);
         let mut messages = vec![system_message];
@@ -60,16 +100,7 @@ impl ContextService {
     async fn tools(&self, messages: &[Message]) -> Result<Vec<Tool>, Error> {
         self.event_emitter.emit(Event::StartFliteringTools).await;
 
-        let get_tools_result = self.tools_repo.tools().await;
-        let tools = get_tools_result.value;
-
-        for error in get_tools_result.errors {
-            self.event_emitter.emit(Event::Error(error.into())).await;
-        }
-
-        let tools = self
-            .most_relevant_tools(messages, &tools, self.top_n_tools)
-            .await?;
+        let tools = self.most_relevant_tools(messages, self.top_n_tools).await?;
 
         self.event_emitter
             .emit(Event::FilteredTools(tools.clone()))
@@ -81,7 +112,6 @@ impl ContextService {
     async fn most_relevant_tools(
         &self,
         messages: &[Message],
-        tools: &[Tool],
         top_n: usize,
     ) -> Result<Vec<Tool>, Error> {
         let messages_text = messages[messages.len().saturating_sub(3)..]
@@ -94,27 +124,19 @@ impl ContextService {
             } + "\n")
             .collect::<String>();
 
-        let mut texts = vec![messages_text];
-
-        let tool_texts = tools
-            .iter()
-            .map(|tool| format!("{}\n{}", tool.name, tool.description));
-        texts.extend(tool_texts);
-
-        let mut embeddings = self
+        let message_embedding = self
             .embedding_model
-            .get_embeddings(texts)
+            .get_embedding(messages_text)
             .await?
             .into_iter()
-            .map(|embedding| embedding.into_iter().map(f16::from_f32).collect());
+            .map(f16::from_f32)
+            .collect::<Vec<_>>();
 
-        let message_embedding = embeddings.next().unwrap();
-        let tool_embeddings = embeddings.collect::<Vec<Vec<f16>>>();
-
-        let mut distancies_with_tools = tool_embeddings
-            .into_iter()
-            .map(|tool_embedding| f16::cos(&message_embedding, &tool_embedding).unwrap())
-            .zip(tools)
+        let mut distancies_with_tools = self
+            .tool_embeddings
+            .iter()
+            .map(|tool_embedding| f16::cos(&message_embedding, tool_embedding).unwrap())
+            .zip(self.tools.iter())
             .collect::<Vec<_>>();
 
         distancies_with_tools
