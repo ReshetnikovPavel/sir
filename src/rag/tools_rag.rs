@@ -80,13 +80,19 @@ fn into_query(messages: &[Message]) -> String {
         .take(3)
         .take_while(|m| !m.is_tool())
         .filter(|m| m.is_user() || m.is_assistant_without_tool_call())
+        .map(|m| match m {
+            Message::User(user_message) => format!("User: {}", user_message.content),
+            Message::Assistant(assistant_message) => {
+                format!("Assistant: {}", assistant_message.content)
+            }
+            _ => unreachable!(),
+        })
         .collect::<Vec<_>>();
     messages.reverse();
 
-    messages.into_iter().map(|m| match m {
-            Message::User(user_message) => user_message.content.clone(),
-            Message::Assistant(assistant_message) => assistant_message.content.clone(),
-            _ => unreachable!(),
-        } + "\n")
-        .collect::<String>()
+    format!(
+        "<query>{}</query><context>{}</context>",
+        messages.last().unwrap(),
+        messages.join("\n")
+    )
 }
