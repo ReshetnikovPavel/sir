@@ -5,6 +5,7 @@ use crate::{
     domain::{
         events::{Event, EventEmitter},
         messages::{AssistantMessage, Message, ToolMessage, UserMessage},
+        states::State,
         tools::ToolCall,
     },
     mcp::tools_repo::McpToolsRepo,
@@ -30,7 +31,7 @@ impl TextPipeline {
             .add_message(
                 chat_id,
                 Message::User(UserMessage {
-                    content: user_prompt + " /no_think",
+                    content: user_prompt,
                 }),
             )
             .await?;
@@ -41,15 +42,15 @@ impl TextPipeline {
                 .last()
                 .is_some_and(|latest_message| !latest_message.tool_calls.is_empty());
 
-            let assistant_message = self
+            let (assistant_message, state) = self
                 .generate_new_assistant_message(chat_id, !not_use_tools)
                 .await?;
 
-            if assistant_message.tool_calls.is_empty() {
-                responses.push(assistant_message);
-                return Ok(responses);
-            }
             responses.push(assistant_message);
+            match state {
+                State::Generate => continue,
+                State::Stop => return Ok(responses),
+            }
         }
     }
 
@@ -57,7 +58,7 @@ impl TextPipeline {
         &self,
         chat_id: Id,
         use_tools: bool,
-    ) -> anyhow::Result<AssistantMessage> {
+    ) -> anyhow::Result<(AssistantMessage, State)> {
         let (history, tools) = if use_tools {
             self.context_service.context(chat_id).await?
         } else {
@@ -92,11 +93,17 @@ impl TextPipeline {
                 .await;
         }
 
+        let called_tools = assistant_message
+            .tool_calls
+            .iter()
+            .map(|tool_call_message| tools_by_names.get(&tool_call_message.name).unwrap())
+            .collect::<Vec<_>>();
+
         let tool_calls = assistant_message
             .tool_calls
             .iter()
-            .map(|tool_call_message| {
-                let tool = tools_by_names.get(&tool_call_message.name).unwrap();
+            .zip(&called_tools)
+            .map(|(tool_call_message, tool)| {
                 ToolCall::from_message_and_server_name(
                     tool_call_message.clone(),
                     tool.server_name.clone(),
@@ -127,6 +134,18 @@ impl TextPipeline {
                 }
             }
         }
-        Ok(assistant_message)
+
+        let all_stop = called_tools
+            .iter()
+            .map(|t| t.on_response)
+            .all(|state| state == State::Stop);
+
+        let state = if all_stop {
+            State::Stop
+        } else {
+            State::Generate
+        };
+
+        Ok((assistant_message, state))
     }
 }

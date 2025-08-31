@@ -7,13 +7,17 @@ use rmcp::{
 
 use crate::{
     domain::tools::{Tool, ToolCall},
-    mcp,
+    mcp::{self, config::McpToolConfig},
 };
 
 use super::{config::McpConfig, server::McpServer};
 
+type ServerName = String;
+type ToolName = String;
+
 pub struct McpToolsRepo {
-    servers: HashMap<String, McpServer>,
+    servers: HashMap<ServerName, McpServer>,
+    tool_configs: HashMap<ToolName, McpToolConfig>,
 }
 
 pub struct WithErrors<T, E> {
@@ -35,8 +39,20 @@ impl McpToolsRepo {
         let (servers, errors): (Vec<_>, Vec<_>) =
             results.into_iter().partition(|result| result.is_ok());
 
+        let tool_configs = config
+            .mcp_servers
+            .values()
+            .flat_map(|server_config| {
+                server_config
+                    .tools
+                    .iter()
+                    .map(|(tool_name, tool_config)| (tool_name.to_owned(), tool_config.clone()))
+            })
+            .collect::<HashMap<_, _>>();
+
         let repo = Self {
             servers: servers.into_iter().filter_map(Result::ok).collect(),
+            tool_configs,
         };
         let errors = errors.into_iter().filter_map(Result::err).collect();
         WithErrors {
@@ -47,11 +63,16 @@ impl McpToolsRepo {
 
     pub async fn tools(&self) -> WithErrors<Vec<Tool>, ServiceError> {
         let tasks = self.servers.iter().map(|(server_name, server)| async {
-            Ok(server
-                .list_all_tools()
-                .await?
-                .into_iter()
-                .map(|t| Tool::from_rmcp_and_server_name(t, server_name.clone())))
+            Ok(server.list_all_tools().await?.into_iter().map(|t| {
+                Tool::new(
+                    t.clone(),
+                    server_name.clone(),
+                    self.tool_configs
+                        .get(&String::from(t.name.clone()))
+                        .map(|config| config.on_response)
+                        .unwrap_or_default(),
+                )
+            }))
         });
         let results = futures::future::join_all(tasks).await;
         let (tools, errors): (Vec<_>, Vec<_>) =

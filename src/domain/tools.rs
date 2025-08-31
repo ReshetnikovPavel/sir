@@ -3,7 +3,7 @@ use rmcp::{self, model::CallToolRequestParam};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::domain::{json::JsonObject, messages::ToolCallMessage};
+use crate::domain::{json::JsonObject, messages::ToolCallMessage, states::State};
 
 #[derive(Clone, Debug, Serialize, Hash, PartialEq, Eq)]
 pub struct Tool {
@@ -11,6 +11,7 @@ pub struct Tool {
     pub description: String,
     pub parameters: JsonObject,
     pub server_name: String,
+    pub on_response: State,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -21,13 +22,15 @@ pub struct ToolCall {
     pub server_name: String,
 }
 
+
 impl Tool {
-    pub fn from_rmcp_and_server_name(tool: rmcp::model::Tool, server_name: String) -> Self {
+    pub fn new(tool: rmcp::model::Tool, server_name: String, on_response: State) -> Self {
         Self {
             name: tool.name.to_string(),
             description: tool.description.to_string(),
             parameters: (*tool.input_schema).clone(),
             server_name,
+            on_response,
         }
     }
 }

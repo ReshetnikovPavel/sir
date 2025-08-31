@@ -2,6 +2,8 @@ use std::{collections::HashMap, path::PathBuf};
 
 use serde::Deserialize;
 
+use crate::domain::states::State;
+
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct McpConfig {
@@ -13,6 +15,15 @@ pub struct McpConfig {
 pub struct McpServerConfig {
     #[serde(flatten)]
     pub transport: McpServerTransportConfig,
+    #[serde(default)]
+    pub tools: HashMap<String, McpToolConfig>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct McpToolConfig {
+    #[serde(default)]
+    pub on_response: State,
 }
 
 #[derive(Debug, Deserialize, Clone)]
