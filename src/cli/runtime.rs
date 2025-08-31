@@ -8,7 +8,7 @@ use std::{
 
 use crate::{
     audio::audio_service::AudioService,
-    db::{chat_repo::ChatRepo, id::Id},
+    db::{chat_repo::{self, ChatRepo}, id::Id},
     text::pipeline::TextPipeline,
 };
 
@@ -72,6 +72,7 @@ impl CliRuntime {
     async fn use_commands(&self, input: &str) -> Option<String> {
         match input {
             "!voice" | "!v" => self.voice_command().await,
+            "!list" | "!l" => self.print_chat().await,
             _ => Some(input.to_owned()),
         }
     }
@@ -85,5 +86,12 @@ impl CliRuntime {
                 None
             }
         }
+    }
+
+    async fn print_chat(&self) -> Option<String> {
+        let chat_id = self.get_chat_id().await;
+        let messages = self.chat_repo.get_messages(chat_id).await.unwrap();
+        println!("{:#?}", messages);
+        None
     }
 }
