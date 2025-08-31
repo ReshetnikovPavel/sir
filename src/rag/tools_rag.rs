@@ -43,19 +43,11 @@ impl ToolsRag {
         messages: &[Message],
         top_n: usize,
     ) -> Result<Vec<Tool>, OpenAIError> {
-        let messages_text = messages[messages.len().saturating_sub(3)..]
-            .iter()
-            .filter(|m| m.is_user() || m.is_assistant_without_tool_call())
-            .map(|m| match m {
-                Message::User(user_message) => user_message.content.clone(),
-                Message::Assistant(assistant_message) => assistant_message.content.clone(),
-                _ => unreachable!(),
-            } + "\n")
-            .collect::<String>();
+        let query = into_query(messages);
 
-        let message_embedding = self
+        let query_embedding = self
             .embedding_model
-            .get_embedding(messages_text)
+            .get_embedding(query)
             .await?
             .into_iter()
             .map(simsimd::f16::from_f32)
@@ -64,7 +56,7 @@ impl ToolsRag {
         let mut distancies_with_tools = self
             .tool_embeddings
             .iter()
-            .map(|tool_embedding| simsimd::f16::cos(&message_embedding, tool_embedding).unwrap())
+            .map(|tool_embedding| simsimd::f16::cos(&query_embedding, tool_embedding).unwrap())
             .zip(self.tools.iter())
             .collect::<Vec<_>>();
 
@@ -79,4 +71,22 @@ impl ToolsRag {
 
         Ok(tools)
     }
+}
+
+fn into_query(messages: &[Message]) -> String {
+    let mut messages = messages
+        .iter()
+        .rev()
+        .take(3)
+        .take_while(|m| !m.is_tool())
+        .filter(|m| m.is_user() || m.is_assistant_without_tool_call())
+        .collect::<Vec<_>>();
+    messages.reverse();
+
+    messages.into_iter().map(|m| match m {
+            Message::User(user_message) => user_message.content.clone(),
+            Message::Assistant(assistant_message) => assistant_message.content.clone(),
+            _ => unreachable!(),
+        } + "\n")
+        .collect::<String>()
 }
