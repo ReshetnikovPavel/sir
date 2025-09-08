@@ -1,6 +1,7 @@
 use std::rc::Rc;
 
 use async_openai::error::OpenAIError;
+use serde::Deserialize;
 use thiserror::Error;
 
 use crate::{
@@ -18,7 +19,14 @@ pub struct ContextService {
     pub chat_repo: Rc<ChatRepo>,
     pub event_emitter: Rc<EventEmitter>,
     pub system_prompt: Message,
-    pub top_n_tools: usize,
+    pub options: ContextOptions,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ContextOptions {
+    pub window: usize,
+    pub tools: usize,
 }
 
 impl ContextService {
@@ -30,34 +38,23 @@ impl ContextService {
     }
 
     pub async fn history(&self, chat_id: Id) -> Result<Vec<Message>, Error> {
-        let system_message = self.system_prompt.clone();
-        let chat = self.chat_repo.get_messages(chat_id).await?;
-        let chat = self.without_old_tool_calls(chat);
-        let mut messages = vec![system_message];
+        let mut chat = self.chat_repo.get_messages(chat_id).await?;
+        chat = remove_old_tool_messages(chat)
+            .into_iter()
+            .rev()
+            .take(self.options.window)
+            .collect::<Vec<_>>();
+        chat.reverse();
+
+        let mut messages = vec![self.system_prompt.clone()];
         messages.extend(chat);
         Ok(messages)
-    }
-
-    fn without_old_tool_calls(&self, mut messages: Vec<Message>) -> Vec<Message> {
-        let latest_tool = messages.iter().rposition(Message::is_tool).unwrap_or(0);
-
-        let user = messages[..latest_tool]
-            .iter()
-            .rposition(Message::is_user)
-            .unwrap_or(0);
-
-        let after_latest_tool = messages.split_off(user);
-        messages
-            .into_iter()
-            .filter(|m| !Message::is_tool(m) && !Message::is_assistant_with_tool_call(m))
-            .chain(after_latest_tool)
-            .collect()
     }
 
     async fn tools(&self, messages: &[Message]) -> Result<Vec<Tool>, Error> {
         self.event_emitter.emit(Event::StartFliteringTools).await;
 
-        let tools = self.tools_rag.tools(messages, self.top_n_tools).await?;
+        let tools = self.tools_rag.tools(messages, self.options.tools).await?;
 
         self.event_emitter
             .emit(Event::FilteredTools(tools.clone()))
@@ -65,6 +62,22 @@ impl ContextService {
 
         Ok(tools)
     }
+}
+
+fn remove_old_tool_messages(mut messages: Vec<Message>) -> Vec<Message> {
+    let latest_tool = messages.iter().rposition(Message::is_tool).unwrap_or(0);
+
+    let user = messages[..latest_tool]
+        .iter()
+        .rposition(Message::is_user)
+        .unwrap_or(0);
+
+    let after_latest_tool = messages.split_off(user);
+    messages
+        .into_iter()
+        .filter(|m| !Message::is_tool(m) && !Message::is_assistant_with_tool_call(m))
+        .chain(after_latest_tool)
+        .collect()
 }
 
 #[derive(Error, Debug)]

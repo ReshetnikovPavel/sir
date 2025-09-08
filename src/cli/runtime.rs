@@ -8,7 +8,7 @@ use std::{
 
 use crate::{
     audio::audio_service::AudioService,
-    db::{chat_repo::{self, ChatRepo}, id::Id},
+    db::{chat_repo::ChatRepo, id::Id},
     text::pipeline::TextPipeline,
 };
 

@@ -7,3 +7,4 @@ config.json
 sir.db*
 last_chat_id.txt
 todo
+run.sh

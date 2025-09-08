@@ -98,7 +98,7 @@ async fn startup(tx: Sender<Event>) {
             content: system_prompt,
         }),
         event_emitter: event_emitter.clone(),
-        top_n_tools: config.chat.top_n_tools,
+        options: config.context
     };
 
     let llm = OpenAILargeLanguageModel {

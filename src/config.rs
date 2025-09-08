@@ -1,7 +1,7 @@
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Deserializer};
 
-use crate::{audio::config::AudioConfig, mcp::config::McpConfig, text::config::ChatConfig};
+use crate::{audio::config::AudioConfig, mcp::config::McpConfig, text::{config::ChatConfig, context_service::ContextOptions}};
 
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -12,6 +12,7 @@ pub struct Config {
     pub chat: ChatConfig,
     #[serde(flatten)]
     pub mcp: McpConfig,
+    pub context: ContextOptions
 }
 
 impl Config {
