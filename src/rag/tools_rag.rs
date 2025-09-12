@@ -5,18 +5,18 @@ use simsimd::SpatialSimilarity as _;
 
 use crate::{
     domain::{messages::Message, tools::Tool},
-    openai::embedding_model::OpenAIEmbeddingModel,
+    openai::embedding_model::EmbeddingModel,
 };
 
 pub struct ToolsRag {
-    embedding_model: Rc<OpenAIEmbeddingModel>,
+    embedding_model: Rc<EmbeddingModel>,
     tools: Vec<Tool>,
     tool_embeddings: Vec<Vec<simsimd::f16>>,
 }
 
 impl ToolsRag {
     pub async fn new(
-        embedding_model: Rc<OpenAIEmbeddingModel>,
+        embedding_model: Rc<EmbeddingModel>,
         tools: Vec<Tool>,
     ) -> Result<Self, OpenAIError> {
         let tool_texts = tools

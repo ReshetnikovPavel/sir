@@ -1,9 +1,11 @@
 use crate::audio::audio_service::AudioService;
 use crate::domain::events::EventEmitter;
 use crate::domain::messages::{Message, SystemMessage};
+use crate::openai::config::TtsConfig;
 use crate::openai::embedding_model::EmbeddingModel;
 use crate::openai::llm::LargeLanguageModel;
 use crate::openai::stt::SpeechToText;
+use crate::openai::tts::TextToSpeech;
 use crate::rag::tools_rag::ToolsRag;
 use crate::{domain::events::Event, text::context_service::ContextService};
 use std::{collections::HashMap, fs::read_to_string, path::PathBuf, rc::Rc, thread};
@@ -98,7 +100,7 @@ async fn startup(tx: Sender<Event>) {
             content: system_prompt,
         }),
         event_emitter: event_emitter.clone(),
-        options: config.context
+        options: config.context,
     };
 
     let llm = LargeLanguageModel {
@@ -125,9 +127,18 @@ async fn startup(tx: Sender<Event>) {
         ),
         model: config.audio.stt.model,
     };
-
+    let tts = TextToSpeech {
+        config: TtsConfig {
+            api_base: "http://127.0.0.1:8000/v1".to_owned(),
+            api_key: "".into(),
+            model: "".to_owned(),
+            voice: "man".to_owned(),
+        },
+        client: reqwest::Client::new(),
+    };
     let audio_service = AudioService {
         stt,
+        tts,
         vad_record_duration: config.audio.vad.record_duration,
     };
 

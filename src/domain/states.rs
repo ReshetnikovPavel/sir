@@ -8,8 +8,6 @@ pub enum State {
     // Say,
 }
 
-
-
 impl Default for State {
     fn default() -> Self {
         Self::Generate

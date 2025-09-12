@@ -22,7 +22,6 @@ pub struct ToolCall {
     pub server_name: String,
 }
 
-
 impl Tool {
     pub fn new(tool: rmcp::model::Tool, server_name: String, on_response: State) -> Self {
         Self {

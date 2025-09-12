@@ -1,6 +1,6 @@
 use async_openai::error::OpenAIError;
 use std::{
-    io::{self, Read},
+    io::{self, Cursor, Read},
     time::Duration,
 };
 use thiserror::Error;
@@ -10,11 +10,12 @@ use voice_activity_detector_silero_v5::{StreamExt as _, VoiceActivityDetector};
 
 use crate::{
     audio::recording::{self, Recording},
-    openai::stt::SpeechToText,
+    openai::{stt::SpeechToText, tts::TextToSpeech},
 };
 
 pub struct AudioService {
     pub stt: SpeechToText,
+    pub tts: TextToSpeech,
     pub vad_record_duration: Duration,
 }
 
@@ -44,6 +45,12 @@ impl AudioService {
         println!("Trascribed::: {}", transcription);
 
         Ok(transcription)
+    }
+
+    pub async fn say_text(&self, input: &str) -> anyhow::Result<()> {
+        let data = self.tts.speech(input).await?;
+        play(data)?;
+        Ok(())
     }
 
     async fn is_speech(&self) -> Result<bool, Error> {
@@ -83,4 +90,17 @@ pub enum Error {
     HoundReadRecordedFile(#[from] hound::Error),
     #[error(transparent)]
     VoiceActivityDetector(#[from] voice_activity_detector_silero_v5::Error),
+}
+
+fn play(data: Vec<u8>) -> anyhow::Result<()> {
+    let stream_handle = rodio::OutputStreamBuilder::open_default_stream()?;
+    let sink = rodio::Sink::connect_new(stream_handle.mixer());
+    let cursor = Cursor::new(data);
+    let decoder = rodio::Decoder::new(cursor)?;
+
+    sink.append(decoder);
+
+    sink.sleep_until_end();
+
+    Ok(())
 }

@@ -41,12 +41,22 @@ impl CliRuntime {
                 None => continue,
             };
 
-            let result = self.text_pipeline.answer_prompt(chat_id, input).await;
+            let result = self
+                .text_pipeline
+                .answer_prompt(chat_id, input)
+                .await
+                .unwrap();
 
-            if let Err(err) = result {
-                println!("Something went wrong while processing your request");
-                log::error!("{}", err)
+            for message in result {
+                if !message.content.is_empty() {
+                    self.audio_service.say_text(&message.content).await.unwrap();
+                }
             }
+
+            // if let Err(err) = result {
+            //     println!("Something went wrong while processing your request");
+            //     log::error!("{}", err)
+            // }
         }
     }
 
