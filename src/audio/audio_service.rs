@@ -10,11 +10,11 @@ use voice_activity_detector_silero_v5::{StreamExt as _, VoiceActivityDetector};
 
 use crate::{
     audio::recording::{self, Recording},
-    openai::stt::OpenAISpeechToText,
+    openai::stt::SpeechToText,
 };
 
 pub struct AudioService {
-    pub stt: OpenAISpeechToText,
+    pub stt: SpeechToText,
     pub vad_record_duration: Duration,
 }
 

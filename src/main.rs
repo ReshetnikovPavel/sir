@@ -1,9 +1,9 @@
 use crate::audio::audio_service::AudioService;
 use crate::domain::events::EventEmitter;
 use crate::domain::messages::{Message, SystemMessage};
-use crate::openai::embedding_model::OpenAIEmbeddingModel;
-use crate::openai::llm::OpenAILargeLanguageModel;
-use crate::openai::stt::OpenAISpeechToText;
+use crate::openai::embedding_model::EmbeddingModel;
+use crate::openai::llm::LargeLanguageModel;
+use crate::openai::stt::SpeechToText;
 use crate::rag::tools_rag::ToolsRag;
 use crate::{domain::events::Event, text::context_service::ContextService};
 use std::{collections::HashMap, fs::read_to_string, path::PathBuf, rc::Rc, thread};
@@ -71,7 +71,7 @@ async fn startup(tx: Sender<Event>) {
     let tools_repo = Rc::new(tools_repo_with_errors.value);
     event_emitter.emit(Event::FinishLoadingTools).await;
 
-    let embedding_model = OpenAIEmbeddingModel {
+    let embedding_model = EmbeddingModel {
         client: Client::with_config(
             OpenAIConfig::new()
                 .with_api_base(config.chat.embedding.api_base)
@@ -101,7 +101,7 @@ async fn startup(tx: Sender<Event>) {
         options: config.context
     };
 
-    let llm = OpenAILargeLanguageModel {
+    let llm = LargeLanguageModel {
         client: Client::with_config(
             OpenAIConfig::new()
                 .with_api_base(config.chat.llm.api_base)
@@ -117,7 +117,7 @@ async fn startup(tx: Sender<Event>) {
         event_emitter: event_emitter.clone(),
     };
 
-    let stt = OpenAISpeechToText {
+    let stt = SpeechToText {
         client: Client::with_config(
             OpenAIConfig::new()
                 .with_api_base(config.audio.stt.api_base)

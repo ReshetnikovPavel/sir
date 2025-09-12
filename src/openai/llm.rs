@@ -10,12 +10,12 @@ use crate::domain::{
     tools::Tool,
 };
 
-pub struct OpenAILargeLanguageModel {
+pub struct LargeLanguageModel {
     pub client: Client<OpenAIConfig>,
     pub model: String,
 }
 
-impl OpenAILargeLanguageModel {
+impl LargeLanguageModel {
     pub async fn chat(
         &self,
         messages: Vec<Message>,

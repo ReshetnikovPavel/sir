@@ -9,12 +9,12 @@ use crate::{
         tools::ToolCall,
     },
     mcp::tools_repo::McpToolsRepo,
-    openai::llm::OpenAILargeLanguageModel,
+    openai::llm::LargeLanguageModel,
     text::context_service::ContextService,
 };
 
 pub struct TextPipeline {
-    pub llm: OpenAILargeLanguageModel,
+    pub llm: LargeLanguageModel,
     pub context_service: ContextService,
     pub chat_repo: Rc<ChatRepo>,
     pub tools_repo: Rc<McpToolsRepo>,

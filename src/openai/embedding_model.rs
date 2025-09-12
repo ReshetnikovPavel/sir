@@ -4,12 +4,12 @@ use async_openai::{
     Client,
 };
 
-pub struct OpenAIEmbeddingModel {
+pub struct EmbeddingModel {
     pub client: Client<async_openai::config::OpenAIConfig>,
     pub model: String,
 }
 
-impl OpenAIEmbeddingModel {
+impl EmbeddingModel {
     #[allow(dead_code)]
     pub async fn get_embedding(&self, input: String) -> Result<Vec<f32>, OpenAIError> {
         let request = CreateEmbeddingRequest {

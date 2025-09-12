@@ -5,12 +5,12 @@ use async_openai::{
     Client,
 };
 
-pub struct OpenAISpeechToText {
+pub struct SpeechToText {
     pub client: Client<OpenAIConfig>,
     pub model: String,
 }
 
-impl OpenAISpeechToText {
+impl SpeechToText {
     pub async fn transcribe(&self, audio: Vec<u8>) -> Result<String, OpenAIError> {
         let request = CreateTranscriptionRequest {
             file: AudioInput {
