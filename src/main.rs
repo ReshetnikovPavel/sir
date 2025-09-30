@@ -11,6 +11,7 @@ use crate::{domain::events::Event, text::context_service::ContextService};
 use std::{collections::HashMap, fs::read_to_string, path::PathBuf, rc::Rc, thread};
 
 use async_openai::{config::OpenAIConfig, Client};
+use clap::Parser;
 use config::Config;
 use dotenv::dotenv;
 use mcp::tools_repo::McpToolsRepo;
@@ -33,10 +34,21 @@ mod openai;
 mod rag;
 mod text;
 
+/// SIR AI
+#[derive(Parser, Debug)]
+#[command(author, version, about)]
+pub struct Args {
+    /// Path to the configuration file
+    #[arg(short, long, default_value = "config.json")]
+    pub config: PathBuf,
+}
+
 #[tokio::main(flavor = "multi_thread", worker_threads = 8)]
 async fn main() {
     dotenv().ok();
     env_logger::init();
+
+    let args = Args::parse();
 
     let (tx, rx) = mpsc::channel::<Event>(128);
     let mut event_processor = CliEventProcessor {
@@ -47,12 +59,12 @@ async fn main() {
         event_processor.run().await;
     });
 
-    tokio::join!(event_processor_handle.join().unwrap(), startup(tx));
+    tokio::join!(event_processor_handle.join().unwrap(), startup(tx, args));
 }
 
-async fn startup(tx: Sender<Event>) {
+async fn startup(tx: Sender<Event>, args: Args) {
     let event_emitter = Rc::new(EventEmitter { tx });
-    let config = Config::load("config.json").await;
+    let config = Config::load(args.config).await;
 
     let db = libsql::Builder::new_local("sir.db")
         .build()

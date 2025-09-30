@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.98"
 async-openai = "0.28.1"
+clap = { version = "4.5.48", features = ["derive"] }
 cpal = "0.16.0"
 dotenv = "0.15.0"
 duration-str = "0.17.0"

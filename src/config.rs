@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Deserializer};
 
@@ -20,7 +22,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub async fn load(path: &str) -> Self {
+    pub async fn load<T: AsRef<Path>>(path: T) -> Self {
         let content = tokio::fs::read_to_string(path)
             .await
             .expect("Can't open a config file");
