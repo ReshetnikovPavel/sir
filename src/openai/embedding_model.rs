@@ -24,6 +24,10 @@ impl EmbeddingModel {
     }
 
     pub async fn get_embeddings(&self, input: Vec<String>) -> Result<Vec<Vec<f32>>, OpenAIError> {
+        if input.is_empty() {
+            return Ok(vec![]);
+        }
+
         let request = CreateEmbeddingRequest {
             model: self.model.clone(),
             input: EmbeddingInput::StringArray(input),
@@ -31,6 +35,7 @@ impl EmbeddingModel {
             user: None,
             dimensions: None,
         };
+        println!("{}", serde_json::to_string_pretty(&request).unwrap());
         let response = self.client.embeddings().create(request).await?;
         Ok(response.data.into_iter().map(|x| x.embedding).collect())
     }
