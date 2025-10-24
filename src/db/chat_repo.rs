@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{rc::Rc, sync::Arc};
 
 use libsql::{params, Connection};
 
@@ -31,11 +31,11 @@ async fn create_tables(conn: &Connection) -> Result<(), libsql::Error> {
 }
 
 pub struct ChatRepo {
-    conn: Rc<Connection>,
+    conn: Arc<Connection>,
 }
 
 impl ChatRepo {
-    pub async fn init(conn: Rc<Connection>) -> Result<Self, libsql::Error> {
+    pub async fn init(conn: Arc<Connection>) -> Result<Self, libsql::Error> {
         create_tables(&conn).await?;
         Ok(Self { conn })
     }
@@ -165,7 +165,7 @@ mod tests {
 
         let db = libsql::Builder::new_local(tmp_path).build().await.unwrap();
         let db_connection = db.connect().unwrap();
-        let db_connection = Rc::new(db_connection);
+        let db_connection = Arc::new(db_connection);
         let chat_repo = ChatRepo::init(db_connection).await.unwrap();
         let chat_repo = Arc::new(chat_repo);
 

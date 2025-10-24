@@ -1,4 +1,5 @@
 use crate::audio::audio_service::AudioService;
+use crate::db::chat_repo;
 use crate::domain::events::EventEmitter;
 use crate::domain::messages::{Message, SystemMessage};
 use crate::openai::config::TtsConfig;
@@ -8,6 +9,7 @@ use crate::openai::stt::SpeechToText;
 use crate::openai::tts::TextToSpeech;
 use crate::rag::tools_rag::ToolsRag;
 use crate::{domain::events::Event, text::context_service::ContextService};
+use std::sync::Arc;
 use std::{collections::HashMap, fs::read_to_string, path::PathBuf, rc::Rc, thread};
 
 use async_openai::{config::OpenAIConfig, Client};
@@ -45,6 +47,7 @@ pub struct Args {
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 8)]
 async fn main() {
+
     dotenv().ok();
     env_logger::init();
 
@@ -59,11 +62,7 @@ async fn main() {
         event_processor.run().await;
     });
 
-    tokio::join!(event_processor_handle.join().unwrap(), startup(tx, args));
-}
-
-async fn startup(tx: Sender<Event>, args: Args) {
-    let event_emitter = Rc::new(EventEmitter { tx });
+    let event_emitter = Arc::new(EventEmitter { tx });
     let config = Config::load(args.config).await;
 
     let db = libsql::Builder::new_local("sir.db")
@@ -71,39 +70,39 @@ async fn startup(tx: Sender<Event>, args: Args) {
         .await
         .expect("Unable to access the database");
     let db_connection = db.connect().expect("Unable to connect to the database");
-    let db_connection = Rc::new(db_connection);
+    let db_connection = Arc::new(db_connection);
     let chat_repo = ChatRepo::init(db_connection)
         .await
         .expect("Unable to initialize chat repository");
-    let chat_repo = Rc::new(chat_repo);
+    let chat_repo = Arc::new(chat_repo);
 
     event_emitter.emit(Event::StartLoadingTools).await;
     let tools_repo_with_errors = McpToolsRepo::from_config(&config.mcp).await;
     for error in tools_repo_with_errors.errors {
         log::error!("{}", error)
     }
-    let tools_repo = Rc::new(tools_repo_with_errors.value);
+    let tools_repo = Arc::new(tools_repo_with_errors.value);
     event_emitter.emit(Event::FinishLoadingTools).await;
 
     let embedding_model = EmbeddingModel {
         client: Client::with_config(
             OpenAIConfig::new()
-                .with_api_base(config.chat.embedding.api_base)
+                .with_api_base(config.chat.embedding.api_base.clone())
                 .with_api_key(config.chat.embedding.api_key.expose_secret()),
         ),
-        model: config.chat.embedding.model,
+        model: config.chat.embedding.model.clone(),
     };
-    let embedding_model = Rc::new(embedding_model);
+    let embedding_model = Arc::new(embedding_model);
 
     let tools_result = tools_repo.tools().await;
     let tools = tools_result.value;
     for error in tools_result.errors {
         event_emitter.emit(Event::Error(error.into())).await;
     }
-    let tools_rag = ToolsRag::new(embedding_model.clone(), tools).await.unwrap();
+    let tools_rag = Arc::new(ToolsRag::new(embedding_model.clone(), tools).await.unwrap());
 
     let system_prompt =
-        read_to_string(config.chat.system_prompt_path).expect("System prompt file does not exist");
+        read_to_string(config.chat.system_prompt_path.clone()).expect("System prompt file does not exist");
 
     let context_service = ContextService {
         tools_rag,
@@ -112,25 +111,31 @@ async fn startup(tx: Sender<Event>, args: Args) {
             content: system_prompt,
         }),
         event_emitter: event_emitter.clone(),
-        options: config.context,
+        options: config.context.clone(),
     };
 
     let llm = LargeLanguageModel {
         client: Client::with_config(
             OpenAIConfig::new()
-                .with_api_base(config.chat.llm.api_base)
+                .with_api_base(config.chat.llm.api_base.clone())
                 .with_api_key(config.chat.llm.api_key.expose_secret()),
         ),
-        model: config.chat.llm.model,
+        model: config.chat.llm.model.clone(),
     };
     let text_pipeline = TextPipeline {
-        llm,
-        context_service,
+        llm: Arc::new(llm),
+        context_service: Arc::new(context_service),
         chat_repo: chat_repo.clone(),
         tools_repo: tools_repo.clone(),
         event_emitter: event_emitter.clone(),
     };
 
+    tokio::join!(event_processor_handle.join().unwrap(), audio::voice_assistant::startup(config, text_pipeline));
+
+    // tokio::join!(event_processor_handle.join().unwrap(), startup(tx, args, text_pipeline));
+}
+
+async fn startup(tx: Sender<Event>, args: Args, text_pipeline: TextPipeline, config: Config, chat_repo: Rc<ChatRepo>) {
     let stt = SpeechToText {
         client: Client::with_config(
             OpenAIConfig::new()

@@ -15,6 +15,7 @@ futures = "0.3.31"
 hound = "3.5.1"
 libsql = "0.9.19"
 log = "0.4.27"
+oww-rs = { git = "https://github.com/ReshetnikovPavel/oww_rs", version = "0.2.0" }
 reqwest = "0.12.23"
 rmcp = { version = "0.1.5", features = ["client", "transport-child-process", "transport-sse"] }
 rodio = "0.21.1"

@@ -5,6 +5,7 @@ use async_openai::{
     Client,
 };
 
+#[derive(Clone)]
 pub struct SpeechToText {
     pub client: Client<OpenAIConfig>,
     pub model: String,

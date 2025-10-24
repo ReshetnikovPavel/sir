@@ -1,4 +1,4 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{collections::HashMap, rc::Rc, sync::Arc};
 
 use crate::{
     db::{chat_repo::ChatRepo, id::Id},
@@ -14,11 +14,11 @@ use crate::{
 };
 
 pub struct TextPipeline {
-    pub llm: LargeLanguageModel,
-    pub context_service: ContextService,
-    pub chat_repo: Rc<ChatRepo>,
-    pub tools_repo: Rc<McpToolsRepo>,
-    pub event_emitter: Rc<EventEmitter>,
+    pub llm: Arc<LargeLanguageModel>,
+    pub context_service: Arc<ContextService>,
+    pub chat_repo: Arc<ChatRepo>,
+    pub tools_repo: Arc<McpToolsRepo>,
+    pub event_emitter: Arc<EventEmitter>,
 }
 
 impl TextPipeline {

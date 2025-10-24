@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{rc::Rc, sync::Arc};
 
 use async_openai::error::OpenAIError;
 use serde::Deserialize;
@@ -15,9 +15,9 @@ use crate::{
 };
 
 pub struct ContextService {
-    pub tools_rag: ToolsRag,
-    pub chat_repo: Rc<ChatRepo>,
-    pub event_emitter: Rc<EventEmitter>,
+    pub tools_rag: Arc<ToolsRag>,
+    pub chat_repo: Arc<ChatRepo>,
+    pub event_emitter: Arc<EventEmitter>,
     pub system_prompt: Message,
     pub options: ContextOptions,
 }

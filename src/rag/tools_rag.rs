@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{rc::Rc, sync::Arc};
 
 use async_openai::error::OpenAIError;
 use simsimd::SpatialSimilarity as _;
@@ -9,14 +9,14 @@ use crate::{
 };
 
 pub struct ToolsRag {
-    embedding_model: Rc<EmbeddingModel>,
+    embedding_model: Arc<EmbeddingModel>,
     tools: Vec<Tool>,
     tool_embeddings: Vec<Vec<simsimd::f16>>,
 }
 
 impl ToolsRag {
     pub async fn new(
-        embedding_model: Rc<EmbeddingModel>,
+        embedding_model: Arc<EmbeddingModel>,
         tools: Vec<Tool>,
     ) -> Result<Self, OpenAIError> {
         let tool_texts = tools

@@ -10,6 +10,7 @@ use crate::domain::{
     tools::Tool,
 };
 
+#[derive(Clone)]
 pub struct LargeLanguageModel {
     pub client: Client<OpenAIConfig>,
     pub model: String,

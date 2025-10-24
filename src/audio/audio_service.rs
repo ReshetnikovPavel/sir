@@ -21,7 +21,7 @@ pub struct AudioService {
 
 impl AudioService {
     pub async fn listen_input(&self) -> Result<String, Error> {
-        let recording = Recording::start(false)?;
+        let recording = Recording::start(/*false*/)?;
         println!("Started recording");
         loop {
             if self.is_speech().await? {
@@ -54,7 +54,8 @@ impl AudioService {
     }
 
     async fn is_speech(&self) -> Result<bool, Error> {
-        let recording = Recording::start(true)?;
+        todo!();
+        let recording = Recording::start(/*true*/)?;
         println!("Started recording for vad");
 
         tokio::time::sleep(self.vad_record_duration).await;
