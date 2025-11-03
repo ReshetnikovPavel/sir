@@ -23,8 +23,8 @@ impl Debug for State {
             Self::Listening(_) => write!(f, "Listening"),
             Self::Transcribing(_) => write!(f, "Transcribing"),
             Self::TextProcessing(_) => write!(f, "TextProcessing"),
-            State::GeneratingSpeech(_) => write!(f, "GeneratingSpeech"),
-            State::Speaking => write!(f, "Speaking"),
+            Self::GeneratingSpeech(_) => write!(f, "GeneratingSpeech"),
+            Self::Speaking => write!(f, "Speaking"),
         }
     }
 }
