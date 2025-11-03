@@ -1,11 +1,10 @@
 use async_openai::error::OpenAIError;
-use reqwest::Client;
 
 use crate::openai::config::TtsConfig;
 
 pub struct TextToSpeech {
     pub config: TtsConfig,
-    pub client: Client,
+    pub client: reqwest::Client,
 }
 
 impl TextToSpeech {

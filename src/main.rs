@@ -47,7 +47,6 @@ pub struct Args {
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 8)]
 async fn main() {
-
     dotenv().ok();
     env_logger::init();
 
@@ -101,8 +100,8 @@ async fn main() {
     }
     let tools_rag = Arc::new(ToolsRag::new(embedding_model.clone(), tools).await.unwrap());
 
-    let system_prompt =
-        read_to_string(config.chat.system_prompt_path.clone()).expect("System prompt file does not exist");
+    let system_prompt = read_to_string(config.chat.system_prompt_path.clone())
+        .expect("System prompt file does not exist");
 
     let context_service = ContextService {
         tools_rag,
@@ -115,12 +114,9 @@ async fn main() {
     };
 
     let llm = LargeLanguageModel {
-        client: Client::with_config(
-            OpenAIConfig::new()
-                .with_api_base(config.chat.llm.api_base.clone())
-                .with_api_key(config.chat.llm.api_key.expose_secret()),
-        ),
         model: config.chat.llm.model.clone(),
+        config: config.chat.llm.clone(),
+        client: reqwest::Client::new(),
     };
     let text_pipeline = TextPipeline {
         llm: Arc::new(llm),
@@ -130,12 +126,21 @@ async fn main() {
         event_emitter: event_emitter.clone(),
     };
 
-    tokio::join!(event_processor_handle.join().unwrap(), audio::voice_assistant::startup(config, text_pipeline));
+    tokio::join!(
+        event_processor_handle.join().unwrap(),
+        audio::voice_assistant::startup(config, text_pipeline)
+    );
 
     // tokio::join!(event_processor_handle.join().unwrap(), startup(tx, args, text_pipeline));
 }
 
-async fn startup(tx: Sender<Event>, args: Args, text_pipeline: TextPipeline, config: Config, chat_repo: Rc<ChatRepo>) {
+async fn startup(
+    tx: Sender<Event>,
+    args: Args,
+    text_pipeline: TextPipeline,
+    config: Config,
+    chat_repo: Rc<ChatRepo>,
+) {
     let stt = SpeechToText {
         client: Client::with_config(
             OpenAIConfig::new()
