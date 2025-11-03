@@ -1,8 +1,8 @@
 use async_openai::{
+    Client,
     config::OpenAIConfig,
     error::OpenAIError,
     types::{AudioInput, CreateTranscriptionRequest, InputSource},
-    Client,
 };
 
 #[derive(Clone)]

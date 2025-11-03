@@ -5,7 +5,7 @@ use std::{
 };
 use thiserror::Error;
 
-use rmcp::{service::RunningService, transport::sse::SseTransportError, RoleClient, ServiceExt};
+use rmcp::{RoleClient, ServiceExt, service::RunningService, transport::sse::SseTransportError};
 
 use super::config::McpServerTransportConfig;
 

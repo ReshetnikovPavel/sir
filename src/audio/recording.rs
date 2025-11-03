@@ -5,8 +5,8 @@ use std::{
 };
 
 use cpal::{
-    traits::{DeviceTrait, HostTrait, StreamTrait},
     BuildStreamError, DefaultStreamConfigError, FromSample, PlayStreamError, Sample, Stream,
+    traits::{DeviceTrait, HostTrait, StreamTrait},
 };
 use log::error;
 use tempfile::NamedTempFile;

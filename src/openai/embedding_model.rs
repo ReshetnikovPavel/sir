@@ -1,7 +1,7 @@
 use async_openai::{
+    Client,
     error::OpenAIError,
     types::{CreateEmbeddingRequest, EmbeddingInput},
-    Client,
 };
 
 pub struct EmbeddingModel {

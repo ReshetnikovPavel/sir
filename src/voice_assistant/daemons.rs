@@ -1,10 +1,10 @@
 use std::{
-    sync::{mpsc::Receiver, Arc, Mutex},
+    sync::{Arc, Mutex, mpsc::Receiver},
     thread::{self, JoinHandle},
     time::{Duration, SystemTime},
 };
 
-use oww_rs::oww::{OwwModel, OWW_MODEL_CHUNK_SIZE};
+use oww_rs::oww::{OWW_MODEL_CHUNK_SIZE, OwwModel};
 use voice_activity_detector_silero_v5::VoiceActivityDetector;
 
 pub const SILERO_SAMPLE_RATE: u32 = 16000;

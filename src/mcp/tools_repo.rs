@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use rmcp::{
-    model::{CallToolRequestMethod, CallToolResult, ErrorData},
     ServiceError,
+    model::{CallToolRequestMethod, CallToolResult, ErrorData},
 };
 
 use crate::{

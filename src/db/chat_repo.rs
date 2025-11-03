@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use libsql::{params, Connection};
+use libsql::{Connection, params};
 
 use crate::{
     db::id::Id,

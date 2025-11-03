@@ -8,7 +8,7 @@ use crate::{domain::events::Event, text::context_service::ContextService};
 use std::sync::Arc;
 use std::{collections::HashMap, fs::read_to_string, path::PathBuf, thread};
 
-use async_openai::{config::OpenAIConfig, Client};
+use async_openai::{Client, config::OpenAIConfig};
 use clap::Parser;
 use config::Config;
 use dotenv::dotenv;

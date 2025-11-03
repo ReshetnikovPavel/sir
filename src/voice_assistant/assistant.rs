@@ -1,10 +1,10 @@
 use std::{
     io::Read,
-    sync::{mpsc::channel, Arc, Mutex},
+    sync::{Arc, Mutex, mpsc::channel},
     time::{Duration, SystemTime},
 };
 
-use async_openai::{config::OpenAIConfig, Client};
+use async_openai::{Client, config::OpenAIConfig};
 use rodio::Sink;
 use secrecy::ExposeSecret as _;
 
