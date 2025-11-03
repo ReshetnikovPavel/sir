@@ -7,7 +7,6 @@ use std::{
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
     BuildStreamError, DefaultStreamConfigError, FromSample, PlayStreamError, Sample, Stream,
-    SupportedStreamConfig,
 };
 use log::error;
 use tempfile::NamedTempFile;
@@ -20,21 +19,13 @@ pub struct Recording {
 }
 
 impl Recording {
-    pub fn start(/*is_vad: bool*/) -> Result<Self, StartRecordingError> {
+    pub fn start() -> Result<Self, StartRecordingError> {
         let file = NamedTempFile::new()?;
         let host = cpal::default_host();
         let device = host
             .default_input_device()
             .ok_or(StartRecordingError::DefaultInputDevice)?;
-        let mut config = device.default_input_config()?;
-        // if is_vad {
-        //     config = SupportedStreamConfig::new(
-        //         1,
-        //         cpal::SampleRate(16000),
-        //         *config.buffer_size(),
-        //         cpal::SampleFormat::I16,
-        //     );
-        // }
+        let config = device.default_input_config()?;
         let spec = wav_spec_from_config(&config);
         let writer = hound::WavWriter::create(&file, spec)?;
         let writer = Arc::new(std::sync::Mutex::new(Some(writer)));

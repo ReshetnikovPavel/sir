@@ -1,4 +1,4 @@
-use std::{rc::Rc, sync::Arc};
+use std::sync::Arc;
 
 use async_openai::error::OpenAIError;
 use serde::Deserialize;

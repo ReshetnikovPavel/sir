@@ -1,4 +1,3 @@
-pub mod audio_service;
 pub mod config;
+pub mod microphone;
 pub mod recording;
-pub mod voice_assistant;

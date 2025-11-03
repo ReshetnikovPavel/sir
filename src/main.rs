@@ -1,16 +1,12 @@
-use crate::audio::audio_service::AudioService;
-use crate::db::chat_repo;
 use crate::domain::events::EventEmitter;
 use crate::domain::messages::{Message, SystemMessage};
-use crate::openai::config::TtsConfig;
 use crate::openai::embedding_model::EmbeddingModel;
 use crate::openai::llm::LargeLanguageModel;
-use crate::openai::stt::SpeechToText;
-use crate::openai::tts::TextToSpeech;
 use crate::rag::tools_rag::ToolsRag;
+use crate::voice_assistant::assistant::VoiceAssistant;
 use crate::{domain::events::Event, text::context_service::ContextService};
 use std::sync::Arc;
-use std::{collections::HashMap, fs::read_to_string, path::PathBuf, rc::Rc, thread};
+use std::{collections::HashMap, fs::read_to_string, path::PathBuf, thread};
 
 use async_openai::{config::OpenAIConfig, Client};
 use clap::Parser;
@@ -18,12 +14,10 @@ use config::Config;
 use dotenv::dotenv;
 use mcp::tools_repo::McpToolsRepo;
 use secrecy::ExposeSecret;
-use tokio::sync::mpsc::{self, Sender};
+use tokio::sync::mpsc::{self};
 
 use crate::{
-    cli::{event_processor::CliEventProcessor, runtime::CliRuntime},
-    db::chat_repo::ChatRepo,
-    text::pipeline::TextPipeline,
+    cli::event_processor::CliEventProcessor, db::chat_repo::ChatRepo, text::pipeline::TextPipeline,
 };
 
 mod audio;
@@ -35,6 +29,7 @@ mod mcp;
 mod openai;
 mod rag;
 mod text;
+mod voice_assistant;
 
 /// SIR AI
 #[derive(Parser, Debug)]
@@ -57,7 +52,7 @@ async fn main() {
         rx,
         stopwatches: HashMap::new(),
     };
-    let event_processor_handle = thread::spawn(async move || {
+    let _event_processor_handle = thread::spawn(async move || {
         event_processor.run().await;
     });
 
@@ -126,49 +121,5 @@ async fn main() {
         event_emitter: event_emitter.clone(),
     };
 
-    tokio::join!(
-        event_processor_handle.join().unwrap(),
-        audio::voice_assistant::startup(config, text_pipeline)
-    );
-
-    // tokio::join!(event_processor_handle.join().unwrap(), startup(tx, args, text_pipeline));
-}
-
-async fn startup(
-    tx: Sender<Event>,
-    args: Args,
-    text_pipeline: TextPipeline,
-    config: Config,
-    chat_repo: Rc<ChatRepo>,
-) {
-    let stt = SpeechToText {
-        client: Client::with_config(
-            OpenAIConfig::new()
-                .with_api_base(config.audio.stt.api_base)
-                .with_api_key(config.audio.stt.api_key.expose_secret()),
-        ),
-        model: config.audio.stt.model,
-    };
-    let tts = TextToSpeech {
-        config: TtsConfig {
-            api_base: "http://127.0.0.1:8000/v1".to_owned(),
-            api_key: "".into(),
-            model: "".to_owned(),
-            voice: "man".to_owned(),
-        },
-        client: reqwest::Client::new(),
-    };
-    let audio_service = AudioService {
-        stt,
-        tts,
-        vad_record_duration: config.audio.vad.record_duration,
-    };
-
-    let cli_runtime = CliRuntime {
-        text_pipeline,
-        audio_service,
-        chat_repo,
-        last_chat_id_path: PathBuf::from("last_chat_id.txt"),
-    };
-    cli_runtime.run().await;
+    VoiceAssistant::startup(config, text_pipeline).await;
 }
