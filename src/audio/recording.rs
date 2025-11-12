@@ -98,12 +98,12 @@ where
     T: Sample,
     U: Sample + hound::Sample + FromSample<T>,
 {
-    if let Ok(mut guard) = writer.try_lock() {
-        if let Some(writer) = guard.as_mut() {
-            for &sample in input.iter() {
-                let sample: U = U::from_sample(sample);
-                writer.write_sample(sample).ok();
-            }
+    if let Ok(mut guard) = writer.try_lock()
+        && let Some(writer) = guard.as_mut()
+    {
+        for &sample in input.iter() {
+            let sample: U = U::from_sample(sample);
+            writer.write_sample(sample).ok();
         }
     }
 }

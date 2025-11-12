@@ -6,7 +6,7 @@ use crate::rag::tools_rag::ToolsRag;
 use crate::voice_assistant::assistant::VoiceAssistant;
 use crate::{domain::events::Event, text::context_service::ContextService};
 use std::sync::Arc;
-use std::{collections::HashMap, fs::read_to_string, path::PathBuf, thread};
+use std::{fs::read_to_string, path::PathBuf, thread};
 
 use async_openai::{Client, config::OpenAIConfig};
 use clap::Parser;

@@ -16,10 +16,7 @@ use crate::{
     text::pipeline::TextPipeline,
     voice_assistant::{
         daemons,
-        state::{
-            GeneratingSpeechState, ListeningState, StateKind, TextProcessingState,
-            TranscribingState,
-        },
+        state::{GeneratingSpeechState, ListeningState, TextProcessingState, TranscribingState},
     },
 };
 

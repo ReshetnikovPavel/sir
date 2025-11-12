@@ -6,11 +6,7 @@ use thiserror::Error;
 
 use crate::{
     db::{chat_repo::ChatRepo, id::Id},
-    domain::{
-        events::{Event, EventEmitter},
-        messages::Message,
-        tools::Tool,
-    },
+    domain::{events::EventEmitter, messages::Message, tools::Tool},
     rag::tools_rag::ToolsRag,
 };
 
