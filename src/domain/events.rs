@@ -1,22 +1,15 @@
 use tokio::sync::mpsc::Sender;
 
-use crate::domain::{
-    messages::{ToolCallMessage, ToolMessage},
-    tools::Tool,
-};
+use crate::{db::id::Id, voice_assistant};
 
 pub enum Event {
     Error(anyhow::Error),
-    ResponseTextChunk(String),
-    ToolCall(ToolCallMessage),
-    ToolCallResult(ToolMessage),
-    RequestedAssistant,
-    AssistantResponded,
-    StartLoadingTools,
-    FinishLoadingTools,
-    StartFliteringTools,
-    FilteredTools(Vec<Tool>),
+    Message(ChatId, MessageId),
+    VoiceAssistantState(voice_assistant::state::StateKind),
 }
+
+type ChatId = Id;
+type MessageId = Id;
 
 pub struct EventEmitter {
     pub tx: Sender<Event>,

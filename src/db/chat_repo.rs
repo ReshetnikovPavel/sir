@@ -62,6 +62,39 @@ impl ChatRepo {
         rows.next().await.unwrap().unwrap().get::<Id>(0)
     }
 
+    pub async fn get_message(&self, chat_id: Id, message_id: Id) -> Result<Message, libsql::Error> {
+        let select_message = "SELECT role, content, tool_calls, tool_call_id, is_error FROM messages WHERE chat_id = ?1 AND id = ?2";
+        let params = params![chat_id, message_id];
+        let row = self
+            .conn
+            .query(select_message, params)
+            .await
+            .unwrap()
+            .next()
+            .await
+            .unwrap()
+            .unwrap();
+
+        let role = row.get::<String>(0).unwrap();
+        let content = row.get(1).unwrap();
+        let message = match role.as_str() {
+            "system" => Message::System(SystemMessage { content }),
+            "user" => Message::User(UserMessage { content }),
+            "assistant" => Message::Assistant(AssistantMessage {
+                content,
+                tool_calls: serde_json::from_str(&row.get::<String>(2).unwrap()).unwrap(),
+            }),
+            "tool" => Message::Tool(ToolMessage {
+                content: serde_json::from_str(&content).unwrap(),
+                tool_call_id: row.get::<String>(3).unwrap(),
+                is_error: row.get::<bool>(4).unwrap(),
+            }),
+            _ => unreachable!(),
+        };
+
+        Ok(message)
+    }
+
     pub async fn get_messages(&self, chat_id: Id) -> Result<Vec<Message>, libsql::Error> {
         let select_messages = "SELECT role, content, tool_calls, tool_call_id, is_error FROM messages WHERE chat_id = ?1";
         let params = params![chat_id];

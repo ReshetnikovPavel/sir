@@ -52,14 +52,7 @@ impl ContextService {
     }
 
     async fn tools(&self, messages: &[Message]) -> Result<Vec<Tool>, Error> {
-        self.event_emitter.emit(Event::StartFliteringTools).await;
-
         let tools = self.tools_rag.tools(messages, self.options.tools).await?;
-
-        self.event_emitter
-            .emit(Event::FilteredTools(tools.clone()))
-            .await;
-
         Ok(tools)
     }
 }

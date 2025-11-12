@@ -11,11 +11,15 @@ use secrecy::ExposeSecret as _;
 use crate::{
     audio::{microphone::microphone_stream, recording::Recording},
     config::Config,
+    domain::events::{Event, EventEmitter},
     openai::{stt::SpeechToText, tts::TextToSpeech},
     text::pipeline::TextPipeline,
     voice_assistant::{
         daemons,
-        state::{GeneratingSpeechState, ListeningState, TextProcessingState, TranscribingState},
+        state::{
+            GeneratingSpeechState, ListeningState, StateKind, TextProcessingState,
+            TranscribingState,
+        },
     },
 };
 
@@ -28,23 +32,38 @@ pub struct VoiceAssistant {
     text_pipeline: Arc<TextPipeline>,
     tts: Arc<TextToSpeech>,
     sink: Sink,
+    event_emitter: Arc<EventEmitter>,
 }
 
 impl VoiceAssistant {
     pub async fn work(self) -> ! {
-        dbg!("Voice Assistant started");
         let mut state = State::Idle;
+        let mut state_kind = state.kind();
+        self.event_emitter
+            .emit(Event::VoiceAssistantState(state_kind))
+            .await;
+
         loop {
-            state = self
-                .handle(state)
-                .await
-                .inspect_err(|e| log::error!("{}", e))
-                .unwrap();
+            state = match self.handle(state).await {
+                Ok(new_state) => {
+                    let new_state_kind = new_state.kind();
+                    if state_kind != new_state_kind {
+                        state_kind = new_state_kind;
+                        self.event_emitter
+                            .emit(Event::VoiceAssistantState(state_kind))
+                            .await;
+                    }
+                    new_state
+                }
+                Err(e) => {
+                    self.event_emitter.emit(Event::Error(e)).await;
+                    State::default()
+                }
+            };
         }
     }
 
     async fn handle(&self, state: State) -> anyhow::Result<State> {
-        dbg!(&state);
         match state {
             State::Idle => self.idle().await,
             State::Listening(listening_state) => self.listening(listening_state).await,
@@ -98,7 +117,6 @@ impl VoiceAssistant {
     async fn transcribing(&self, state: TranscribingState) -> anyhow::Result<State> {
         if state.stt_thread_handle.is_finished() {
             let text = state.stt_thread_handle.await??;
-            dbg!(&text);
             let text_pipeline = self.text_pipeline.clone();
             let text_pipeline_handle =
                 tokio::spawn(async move { text_pipeline.answer_prompt(3, text).await });
@@ -154,7 +172,11 @@ impl VoiceAssistant {
         wakeword_prob > 0.5
     }
 
-    pub async fn startup(config: Config, text_pipeline: TextPipeline) -> ! {
+    pub async fn startup(
+        config: Config,
+        text_pipeline: TextPipeline,
+        event_emitter: Arc<EventEmitter>,
+    ) -> ! {
         let (microphone_i16_sender, microphone_i16_receiver) = channel();
         let (microphone_f32_sender, microphone_f32_receiver) = channel();
 
@@ -187,6 +209,7 @@ impl VoiceAssistant {
             text_pipeline: Arc::new(text_pipeline),
             tts: Arc::new(tts),
             sink,
+            event_emitter,
         };
 
         let _microphone_i16_handle = microphone_stream(

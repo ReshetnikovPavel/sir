@@ -16,12 +16,9 @@ use mcp::tools_repo::McpToolsRepo;
 use secrecy::ExposeSecret;
 use tokio::sync::mpsc::{self};
 
-use crate::{
-    cli::event_processor::CliEventProcessor, db::chat_repo::ChatRepo, text::pipeline::TextPipeline,
-};
+use crate::{db::chat_repo::ChatRepo, text::pipeline::TextPipeline, tui::events::EventProcessor};
 
 mod audio;
-mod cli;
 mod config;
 mod db;
 mod domain;
@@ -29,6 +26,7 @@ mod mcp;
 mod openai;
 mod rag;
 mod text;
+mod tui;
 mod voice_assistant;
 
 /// SIR AI
@@ -48,15 +46,6 @@ async fn main() {
     let args = Args::parse();
 
     let (tx, rx) = mpsc::channel::<Event>(128);
-    let mut event_processor = CliEventProcessor {
-        rx,
-        stopwatches: HashMap::new(),
-    };
-    let _event_processor_handle = thread::spawn(async move || {
-        event_processor.run().await;
-    });
-
-    let event_emitter = Arc::new(EventEmitter { tx });
     let config = Config::load(args.config).await;
 
     let db = libsql::Builder::new_local("sir.db")
@@ -70,13 +59,21 @@ async fn main() {
         .expect("Unable to initialize chat repository");
     let chat_repo = Arc::new(chat_repo);
 
-    event_emitter.emit(Event::StartLoadingTools).await;
+    let mut event_processor = EventProcessor {
+        rx,
+        chat_repo: chat_repo.clone(),
+    };
+    let _event_processor_handle = thread::spawn(async move || {
+        event_processor.run().await;
+    });
+
+    let event_emitter = Arc::new(EventEmitter { tx });
+
     let tools_repo_with_errors = McpToolsRepo::from_config(&config.mcp).await;
     for error in tools_repo_with_errors.errors {
         log::error!("{}", error)
     }
     let tools_repo = Arc::new(tools_repo_with_errors.value);
-    event_emitter.emit(Event::FinishLoadingTools).await;
 
     let embedding_model = EmbeddingModel {
         client: Client::with_config(
@@ -121,5 +118,5 @@ async fn main() {
         event_emitter: event_emitter.clone(),
     };
 
-    VoiceAssistant::startup(config, text_pipeline).await;
+    VoiceAssistant::startup(config, text_pipeline, event_emitter).await;
 }

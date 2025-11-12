@@ -27,7 +27,8 @@ impl TextPipeline {
         chat_id: i64,
         user_prompt: String,
     ) -> anyhow::Result<Vec<AssistantMessage>> {
-        self.chat_repo
+        let message_id = self
+            .chat_repo
             .add_message(
                 chat_id,
                 Message::User(UserMessage {
@@ -35,6 +36,9 @@ impl TextPipeline {
                 }),
             )
             .await?;
+        self.event_emitter
+            .emit(Event::Message(chat_id, message_id))
+            .await;
 
         let mut responses: Vec<AssistantMessage> = vec![];
         loop {
@@ -70,28 +74,18 @@ impl TextPipeline {
             .map(|tool| (tool.name.clone(), tool.clone()))
             .collect::<HashMap<_, _>>();
 
-        self.event_emitter.emit(Event::RequestedAssistant).await;
-
         let assistant_message = self
             .llm
             .chat(history, if tools.is_empty() { None } else { Some(tools) })
             .await?;
 
-        self.event_emitter
-            .emit(Event::ResponseTextChunk(assistant_message.content.clone()))
-            .await;
-
-        self.chat_repo
+        let message_id = self
+            .chat_repo
             .add_message(chat_id, Message::Assistant(assistant_message.clone()))
             .await?;
-
-        self.event_emitter.emit(Event::AssistantResponded).await;
-
-        for tool_call_message in &assistant_message.tool_calls {
-            self.event_emitter
-                .emit(Event::ToolCall(tool_call_message.clone()))
-                .await;
-        }
+        self.event_emitter
+            .emit(Event::Message(chat_id, message_id))
+            .await;
 
         let called_tools = assistant_message
             .tool_calls
@@ -122,12 +116,13 @@ impl TextPipeline {
             match res {
                 Ok(res) => {
                     let tool_message = ToolMessage::from_call_tool_result(id, res);
-                    self.event_emitter
-                        .emit(Event::ToolCallResult(tool_message.clone()))
-                        .await;
-                    self.chat_repo
+                    let message_id = self
+                        .chat_repo
                         .add_message(chat_id, Message::Tool(tool_message))
                         .await?;
+                    self.event_emitter
+                        .emit(Event::Message(chat_id, message_id))
+                        .await;
                 }
                 Err(e) => {
                     self.event_emitter.emit(Event::Error(e.into())).await;
