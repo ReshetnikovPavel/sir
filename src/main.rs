@@ -14,7 +14,7 @@ use config::Config;
 use dotenv::dotenv;
 use mcp::tools_repo::McpToolsRepo;
 use secrecy::ExposeSecret;
-use tokio::sync::mpsc::{self};
+use tokio::sync::mpsc::channel;
 
 use crate::{db::chat_repo::ChatRepo, text::pipeline::TextPipeline, tui::events::EventProcessor};
 
@@ -45,7 +45,7 @@ async fn main() {
 
     let args = Args::parse();
 
-    let (tx, rx) = mpsc::channel::<Event>(128);
+    let (event_sender, event_receiver) = channel(16);
     let config = Config::load(args.config).await;
 
     let db = libsql::Builder::new_local("sir.db")
@@ -60,14 +60,12 @@ async fn main() {
     let chat_repo = Arc::new(chat_repo);
 
     let mut event_processor = EventProcessor {
-        rx,
+        event_receiver,
         chat_repo: chat_repo.clone(),
     };
-    let _event_processor_handle = thread::spawn(async move || {
-        event_processor.run().await;
-    });
+    let _event_processor_handle = tokio::spawn(async move { event_processor.run().await });
 
-    let event_emitter = Arc::new(EventEmitter { tx });
+    let event_emitter = Arc::new(EventEmitter { event_sender });
 
     let tools_repo_with_errors = McpToolsRepo::from_config(&config.mcp).await;
     for error in tools_repo_with_errors.errors {

@@ -57,6 +57,7 @@ impl VoiceAssistant {
                     State::default()
                 }
             };
+            tokio::time::sleep(Duration::from_millis(50)).await;
         }
     }
 

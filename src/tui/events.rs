@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+
 use tokio::sync::mpsc::Receiver;
 
 use crate::{
@@ -9,13 +10,13 @@ use crate::{
 };
 
 pub struct EventProcessor {
-    pub rx: Receiver<Event>,
+    pub event_receiver: Receiver<Event>,
     pub chat_repo: Arc<ChatRepo>,
 }
 
 impl EventProcessor {
-    pub async fn run(&mut self) {
-        while let Some(event) = self.rx.recv().await {
+    pub async fn run(&mut self) -> ! {
+        while let Some(event) = self.event_receiver.recv().await {
             if let Err(err) = self.process(event).await {
                 log::error!("{}", err);
             }
