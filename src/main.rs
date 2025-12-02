@@ -48,17 +48,22 @@ async fn main() {
     let (event_sender, event_receiver) = channel(16);
     let config = Config::load(args.config).await;
 
+    log::info!("Connecting to the database");
     let db = libsql::Builder::new_local("sir.db")
         .build()
         .await
         .expect("Unable to access the database");
     let db_connection = db.connect().expect("Unable to connect to the database");
     let db_connection = Arc::new(db_connection);
+
+    log::info!("Creating chat repository");
     let chat_repo = ChatRepo::init(db_connection)
         .await
         .expect("Unable to initialize chat repository");
+
     let chat_repo = Arc::new(chat_repo);
 
+    log::info!("Starting event processor");
     let mut event_processor = EventProcessor {
         event_receiver,
         chat_repo: chat_repo.clone(),
@@ -67,6 +72,7 @@ async fn main() {
 
     let event_emitter = Arc::new(EventEmitter { event_sender });
 
+    log::info!("Loading tools");
     let tools_repo_with_errors = McpToolsRepo::from_config(&config.mcp).await;
     for error in tools_repo_with_errors.errors {
         log::error!("{}", error)
@@ -83,6 +89,7 @@ async fn main() {
     };
     let embedding_model = Arc::new(embedding_model);
 
+    log::info!("Initiating tools RAG");
     let tools_result = tools_repo.tools().await;
     let tools = tools_result.value;
     for error in tools_result.errors {
@@ -90,6 +97,7 @@ async fn main() {
     }
     let tools_rag = Arc::new(ToolsRag::new(embedding_model.clone(), tools).await.unwrap());
 
+    log::info!("Reading System prompt");
     let system_prompt = read_to_string(config.chat.system_prompt_path.clone())
         .expect("System prompt file does not exist");
 
@@ -116,5 +124,6 @@ async fn main() {
         event_emitter: event_emitter.clone(),
     };
 
+    log::info!("Starting voice assistant");
     VoiceAssistant::startup(config, text_pipeline, event_emitter).await;
 }

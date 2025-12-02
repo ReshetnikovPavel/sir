@@ -181,7 +181,9 @@ impl VoiceAssistant {
         let vad_prob: Arc<Mutex<f32>> = Arc::new(Mutex::new(0.0));
         let oww_prob: Arc<Mutex<f32>> = Arc::new(Mutex::new(0.0));
 
+        log::info!("Starting Voice Activity Detector");
         let _handle_vad = daemons::vad(microphone_i16_receiver, vad_prob.clone());
+        log::info!("Starting OpenWakeWord");
         let _handle_oww = daemons::oww(microphone_f32_receiver, oww_prob.clone());
 
         let stt = SpeechToText {
@@ -210,6 +212,7 @@ impl VoiceAssistant {
             event_emitter,
         };
 
+        log::info!("Listening from microphones");
         let _microphone_i16_handle = microphone_stream(
             microphone_i16_sender,
             cpal::SupportedStreamConfig::new(
@@ -230,6 +233,7 @@ impl VoiceAssistant {
             ),
         );
 
+        log::info!("Start working!");
         worker.work().await;
     }
 }
