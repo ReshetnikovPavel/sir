@@ -28,7 +28,6 @@ impl SpeechToText {
             timestamp_granularities: None,
         };
         let response = self.client.audio().transcribe(request).await?;
-        dbg!(&response);
         Ok(response.text)
     }
 }
