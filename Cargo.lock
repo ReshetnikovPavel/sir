@@ -3538,7 +3538,7 @@ dependencies = [
  "thiserror 2.0.17",
  "tokio",
  "tokio-stream",
- "voice_activity_detector_silero_v5",
+ "voice_activity_detector",
 ]
 
 [[package]]
@@ -4586,10 +4586,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
-name = "voice_activity_detector_silero_v5"
-version = "0.2.0-silero-v5"
+name = "voice_activity_detector"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0770f16e9ce1e343ba360cf20e28145a425b76b32fa62a69218398bfc9ddba40"
+checksum = "50407ebe9f37f46ee5d9a7a4228324f400439de9c62861273ab34bcfbdaf08b6"
 dependencies = [
  "futures",
  "ndarray",

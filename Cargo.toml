@@ -27,7 +27,7 @@ tempfile = "3.20.0"
 thiserror = "2.0.12"
 tokio = { version = "1.45.0", features = ["fs", "full", "io-std", "macros", "rt", "rt-multi-thread", "tokio-macros"] }
 tokio-stream = "0.1.17"
-voice_activity_detector_silero_v5 = { version = "0.2.0-silero-v5", features = ["async"] }
+voice_activity_detector = { version = "0.2.1", features = ["async"] }
 
 [dev-dependencies]
 rand = "0.9.2"
