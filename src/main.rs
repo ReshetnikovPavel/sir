@@ -73,11 +73,11 @@ async fn main() {
     let event_emitter = Arc::new(EventEmitter { event_sender });
 
     log::info!("Loading tools");
-    let tools_repo_with_errors = McpToolsRepo::from_config(&config.mcp).await;
-    for error in tools_repo_with_errors.errors {
+    let (tools, errors) = McpToolsRepo::from_config(&config.mcp).await;
+    for error in errors {
         log::error!("{}", error)
     }
-    let tools_repo = Arc::new(tools_repo_with_errors.value);
+    let tools_repo = Arc::new(tools);
 
     let embedding_model = EmbeddingModel {
         client: Client::with_config(
@@ -90,9 +90,8 @@ async fn main() {
     let embedding_model = Arc::new(embedding_model);
 
     log::info!("Initiating tools RAG");
-    let tools_result = tools_repo.tools().await;
-    let tools = tools_result.value;
-    for error in tools_result.errors {
+    let (tools, errors) = tools_repo.tools().await;
+    for error in errors {
         event_emitter.emit(Event::Error(error.into())).await;
     }
     let tools_rag = Arc::new(ToolsRag::new(embedding_model.clone(), tools).await.unwrap());

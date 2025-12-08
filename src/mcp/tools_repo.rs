@@ -20,13 +20,8 @@ pub struct McpToolsRepo {
     tool_configs: HashMap<ToolName, McpToolConfig>,
 }
 
-pub struct WithErrors<T, E> {
-    pub value: T,
-    pub errors: Vec<E>,
-}
-
 impl McpToolsRepo {
-    pub async fn from_config(config: &McpConfig) -> WithErrors<Self, mcp::server::Error> {
+    pub async fn from_config(config: &McpConfig) -> (Self, Vec<mcp::server::Error>) {
         let tasks = config.mcp_servers.iter().map(|(name, server_config)| {
             let transport_config = server_config.transport.clone();
             let name = name.to_string();
@@ -55,13 +50,11 @@ impl McpToolsRepo {
             tool_configs,
         };
         let errors = errors.into_iter().filter_map(Result::err).collect();
-        WithErrors {
-            value: repo,
-            errors,
-        }
+
+        (repo, errors)
     }
 
-    pub async fn tools(&self) -> WithErrors<Vec<Tool>, ServiceError> {
+    pub async fn tools(&self) -> (Vec<Tool>, Vec<ServiceError>) {
         let tasks = self.servers.iter().map(|(server_name, server)| async {
             Ok(server.list_all_tools().await?.into_iter().map(|t| {
                 Tool::new(
@@ -85,10 +78,8 @@ impl McpToolsRepo {
             .collect::<Vec<_>>();
 
         let errors = errors.into_iter().filter_map(Result::err).collect();
-        WithErrors {
-            value: tools,
-            errors,
-        }
+
+        (tools, errors)
     }
 
     pub async fn call_tools(
