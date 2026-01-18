@@ -4,9 +4,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use async_openai::{Client, config::OpenAIConfig};
 use rodio::Sink;
-use secrecy::ExposeSecret as _;
 
 use crate::{
     audio::{microphone::microphone_stream, recording::Recording},
@@ -187,12 +185,8 @@ impl VoiceAssistant {
         let _handle_oww = daemons::oww(microphone_f32_receiver, oww_prob.clone());
 
         let stt = SpeechToText {
-            client: Client::with_config(
-                OpenAIConfig::new()
-                    .with_api_base(config.audio.stt.api_base)
-                    .with_api_key(config.audio.stt.api_key.expose_secret()),
-            ),
-            model: config.audio.stt.model,
+            config: config.audio.stt,
+            client: reqwest::Client::new(),
         };
 
         let tts = TextToSpeech {

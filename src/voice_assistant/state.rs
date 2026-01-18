@@ -59,7 +59,7 @@ pub struct ListeningState {
 }
 
 pub struct TranscribingState {
-    pub stt_thread_handle: JoinHandle<Result<String, OpenAIError>>,
+    pub stt_thread_handle: JoinHandle<Result<String, anyhow::Error>>,
 }
 
 pub struct TextProcessingState {

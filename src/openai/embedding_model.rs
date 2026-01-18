@@ -30,10 +30,7 @@ impl EmbeddingModel {
             .client
             .post(url)
             .body(body.to_string())
-            .header(
-                "Authorization",
-                format!("Bearer {}", self.config.api_key.expose_secret()),
-            )
+            .bearer_auth(self.config.api_key.expose_secret())
             .send()
             .await?
             .error_for_status()?;
@@ -63,15 +60,12 @@ impl EmbeddingModel {
             .client
             .post(url)
             .body(body.to_string())
-            .header(
-                "Authorization",
-                format!("Bearer {}", self.config.api_key.expose_secret()),
-            )
+            .bearer_auth(self.config.api_key.expose_secret())
             .send()
             .await?
             .error_for_status()?;
 
-        let response = response.json::<Embeddings>().await.unwrap();
+        let response = response.json::<Embeddings>().await?;
         Ok(response.data.into_iter().map(|emb| emb.embedding).collect())
     }
 }

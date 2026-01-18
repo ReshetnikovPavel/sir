@@ -1,33 +1,43 @@
-use async_openai::{
-    Client,
-    config::OpenAIConfig,
-    error::OpenAIError,
-    types::{AudioInput, CreateTranscriptionRequest, InputSource},
-};
+use reqwest::multipart::{Form, Part};
+use secrecy::ExposeSecret as _;
+use serde::Deserialize;
+
+use crate::openai::config::OpenAIConfig;
 
 #[derive(Clone)]
 pub struct SpeechToText {
-    pub client: Client<OpenAIConfig>,
-    pub model: String,
+    pub config: OpenAIConfig,
+    pub client: reqwest::Client,
+}
+
+
+#[derive(Deserialize)]
+struct Transcription {
+    text: String,
 }
 
 impl SpeechToText {
-    pub async fn transcribe(&self, audio: Vec<u8>) -> Result<String, OpenAIError> {
-        let request = CreateTranscriptionRequest {
-            file: AudioInput {
-                source: InputSource::VecU8 {
-                    filename: "recording.wav".to_owned(),
-                    vec: audio,
-                },
-            },
-            model: self.model.clone(),
-            prompt: None,
-            response_format: None,
-            temperature: None,
-            language: None,
-            timestamp_granularities: None,
-        };
-        let response = self.client.audio().transcribe(request).await?;
+    pub async fn transcribe(&self, audio: Vec<u8>) -> Result<String, anyhow::Error> {
+        let url = self.config.api_base.clone() + "/audio/transcriptions";
+        let form = Form::new()
+            .part(
+                "file",
+                Part::bytes(audio)
+                    .file_name("recording.wav")
+                    .mime_str("audio/wav")?,
+            )
+            .text("model", self.config.model.to_string());
+
+        let response = self
+            .client
+            .post(url)
+            .multipart(form)
+            .bearer_auth(self.config.api_key.expose_secret())
+            .send()
+            .await?
+            .error_for_status()?;
+
+        let response = response.json::<Transcription>().await?;
         Ok(response.text)
     }
 }

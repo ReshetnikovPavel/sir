@@ -21,10 +21,7 @@ impl TextToSpeech {
             .client
             .post(url)
             .body(body.to_string())
-            .header(
-                "Authorization",
-                format!("Bearer {}", self.config.api_key.expose_secret()),
-            )
+            .bearer_auth(self.config.api_key.expose_secret())
             .send()
             .await?
             .error_for_status()?;
