@@ -6,14 +6,12 @@ use crate::rag::tools_rag::ToolsRag;
 use crate::voice_assistant::assistant::VoiceAssistant;
 use crate::{domain::events::Event, text::context_service::ContextService};
 use std::sync::Arc;
-use std::{fs::read_to_string, path::PathBuf, thread};
+use std::{fs::read_to_string, path::PathBuf};
 
-use async_openai::{Client, config::OpenAIConfig};
 use clap::Parser;
 use config::Config;
 use dotenv::dotenv;
 use mcp::tools_repo::McpToolsRepo;
-use secrecy::ExposeSecret;
 use tokio::sync::mpsc::channel;
 
 use crate::{db::chat_repo::ChatRepo, text::pipeline::TextPipeline, tui::events::EventProcessor};
@@ -80,12 +78,8 @@ async fn main() {
     let tools_repo = Arc::new(tools);
 
     let embedding_model = EmbeddingModel {
-        client: Client::with_config(
-            OpenAIConfig::new()
-                .with_api_base(config.chat.embedding.api_base.clone())
-                .with_api_key(config.chat.embedding.api_key.expose_secret()),
-        ),
-        model: config.chat.embedding.model.clone(),
+        client: reqwest::Client::new(),
+        config: config.chat.embedding.clone()
     };
     let embedding_model = Arc::new(embedding_model);
 

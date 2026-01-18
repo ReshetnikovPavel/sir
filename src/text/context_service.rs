@@ -26,7 +26,7 @@ pub struct ContextOptions {
 }
 
 impl ContextService {
-    pub async fn context(&self, chat_id: Id) -> Result<(Vec<Message>, Vec<Tool>), Error> {
+    pub async fn context(&self, chat_id: Id) -> Result<(Vec<Message>, Vec<Tool>), anyhow::Error> {
         let history = self.history(chat_id).await?;
         let tools = self.tools(&history).await?;
 
@@ -47,7 +47,7 @@ impl ContextService {
         Ok(messages)
     }
 
-    async fn tools(&self, messages: &[Message]) -> Result<Vec<Tool>, Error> {
+    async fn tools(&self, messages: &[Message]) -> Result<Vec<Tool>, anyhow::Error> {
         let tools = self.tools_rag.tools(messages, self.options.tools).await?;
         Ok(tools)
     }

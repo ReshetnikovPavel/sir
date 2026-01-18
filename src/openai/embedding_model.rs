@@ -1,41 +1,77 @@
-use async_openai::{
-    Client,
-    error::OpenAIError,
-    types::{CreateEmbeddingRequest, EmbeddingInput},
-};
+use secrecy::ExposeSecret as _;
+use serde::Deserialize;
+
+use crate::openai::config::OpenAIConfig;
 
 pub struct EmbeddingModel {
-    pub client: Client<async_openai::config::OpenAIConfig>,
-    pub model: String,
+    pub client: reqwest::Client,
+    pub config: OpenAIConfig,
+}
+
+#[derive(Deserialize)]
+struct Embedding {
+    embedding: Vec<f32>,
+}
+
+#[derive(Deserialize)]
+struct Embeddings {
+    data: Vec<Embedding>,
 }
 
 impl EmbeddingModel {
-    #[allow(dead_code)]
-    pub async fn get_embedding(&self, input: String) -> Result<Vec<f32>, OpenAIError> {
-        let request = CreateEmbeddingRequest {
-            model: self.model.clone(),
-            input: EmbeddingInput::String(input),
-            encoding_format: None,
-            user: None,
-            dimensions: None,
-        };
-        let response = self.client.embeddings().create(request).await?;
-        Ok(response.data.into_iter().next().unwrap().embedding)
+    pub async fn get_embedding(&self, input: String) -> anyhow::Result<Vec<f32>> {
+        let url = self.config.api_base.clone() + "/embeddings";
+        let body = serde_json::json!({
+            "input": input,
+            "model": self.config.model,
+        });
+
+        let response = self
+            .client
+            .post(url)
+            .body(body.to_string())
+            .header(
+                "Authorization",
+                format!("Bearer {}", self.config.api_key.expose_secret()),
+            )
+            .send()
+            .await?
+            .error_for_status()?;
+
+        let response = response
+            .json::<Embeddings>()
+            .await?
+            .data
+            .into_iter()
+            .next()
+            .ok_or(anyhow::Error::msg("Embedding vector is empty"))?;
+
+        Ok(response.embedding)
     }
 
-    pub async fn get_embeddings(&self, input: Vec<String>) -> Result<Vec<Vec<f32>>, OpenAIError> {
+    pub async fn get_embeddings(&self, input: Vec<String>) -> Result<Vec<Vec<f32>>, anyhow::Error> {
         if input.is_empty() {
             return Ok(vec![]);
         }
 
-        let request = CreateEmbeddingRequest {
-            model: self.model.clone(),
-            input: EmbeddingInput::StringArray(input),
-            encoding_format: None,
-            user: None,
-            dimensions: None,
-        };
-        let response = self.client.embeddings().create(request).await?;
-        Ok(response.data.into_iter().map(|x| x.embedding).collect())
+        let url = self.config.api_base.clone() + "/embeddings";
+        let body = serde_json::json!({
+            "input": input,
+            "model": self.config.model,
+        });
+        let response = self
+            .client
+            .post(url)
+            .body(body.to_string())
+            .header(
+                "Authorization",
+                format!("Bearer {}", self.config.api_key.expose_secret()),
+            )
+            .send()
+            .await?
+            .error_for_status()?;
+
+        let response = response.json::<Embeddings>().await.unwrap();
+        Ok(response.data.into_iter().map(|emb| emb.embedding).collect())
     }
 }

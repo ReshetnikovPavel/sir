@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use async_openai::error::OpenAIError;
 use simsimd::SpatialSimilarity as _;
 
 use crate::{
@@ -18,7 +17,7 @@ impl ToolsRag {
     pub async fn new(
         embedding_model: Arc<EmbeddingModel>,
         tools: Vec<Tool>,
-    ) -> Result<Self, OpenAIError> {
+    ) -> Result<Self, anyhow::Error> {
         let tool_texts = tools
             .iter()
             .map(|tool| format!("{}\n{}", tool.name, tool.description))
@@ -42,7 +41,7 @@ impl ToolsRag {
         &self,
         messages: &[Message],
         top_n: usize,
-    ) -> Result<Vec<Tool>, OpenAIError> {
+    ) -> Result<Vec<Tool>, anyhow::Error> {
         let query = into_query(messages);
 
         let query_embedding = self

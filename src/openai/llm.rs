@@ -34,11 +34,11 @@ impl LargeLanguageModel {
             ..Default::default()
         };
         let url = self.config.api_base.clone() + "/chat/completions";
-        let json = serde_json::to_string(&request)?;
+        let body = serde_json::to_string(&request)?;
         let response = self
             .client
             .post(url)
-            .body(json)
+            .body(body)
             .header(
                 "Authorization",
                 format!("Bearer {}", self.config.api_key.expose_secret()),
