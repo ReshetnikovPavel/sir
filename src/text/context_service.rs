@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use async_openai::error::OpenAIError;
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -75,6 +74,4 @@ pub enum Error {
     Sql(#[from] libsql::Error),
     #[error(transparent)]
     Mcp(#[from] rmcp::ServiceError),
-    #[error(transparent)]
-    OpenAI(#[from] OpenAIError),
 }

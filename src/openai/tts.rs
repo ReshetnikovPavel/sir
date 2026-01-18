@@ -1,4 +1,3 @@
-use async_openai::error::OpenAIError;
 use secrecy::ExposeSecret as _;
 
 use crate::openai::config::TtsConfig;
@@ -9,7 +8,7 @@ pub struct TextToSpeech {
 }
 
 impl TextToSpeech {
-    pub async fn speech(&self, input: &str) -> Result<Vec<u8>, OpenAIError> {
+    pub async fn speech(&self, input: &str) -> Result<Vec<u8>, anyhow::Error> {
         let url = self.config.api_base.clone() + "/audio/speech";
         let body = serde_json::json!({
             "input": input,

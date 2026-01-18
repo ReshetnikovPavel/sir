@@ -1,7 +1,5 @@
-use async_openai::types::{ChatCompletionTool, FunctionObject};
 use rmcp::{self, model::CallToolRequestParam};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 use crate::domain::{json::JsonObject, messages::ToolCallMessage, states::State};
 
@@ -30,20 +28,6 @@ impl Tool {
             parameters: (*tool.input_schema).clone(),
             server_name,
             on_response,
-        }
-    }
-}
-
-impl From<Tool> for ChatCompletionTool {
-    fn from(tool: Tool) -> Self {
-        Self {
-            r#type: async_openai::types::ChatCompletionToolType::Function,
-            function: FunctionObject {
-                name: tool.name,
-                description: Some(tool.description),
-                parameters: Some(Value::Object(tool.parameters)),
-                strict: None,
-            },
         }
     }
 }

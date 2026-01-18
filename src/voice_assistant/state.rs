@@ -1,6 +1,5 @@
 use std::{fmt::Debug, time::SystemTime};
 
-use async_openai::error::OpenAIError;
 use tokio::task::JoinHandle;
 
 use crate::{audio::recording::Recording, domain::messages::AssistantMessage};
@@ -67,5 +66,5 @@ pub struct TextProcessingState {
 }
 
 pub struct GeneratingSpeechState {
-    pub tts_thread_handle: JoinHandle<Result<Vec<u8>, OpenAIError>>,
+    pub tts_thread_handle: JoinHandle<Result<Vec<u8>, anyhow::Error>>,
 }

@@ -105,7 +105,6 @@ async fn main() {
     };
 
     let llm = LargeLanguageModel {
-        model: config.chat.llm.model.clone(),
         config: config.chat.llm.clone(),
         client: reqwest::Client::new(),
     };

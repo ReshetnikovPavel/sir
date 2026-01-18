@@ -1,5 +1,5 @@
-use async_openai::types::{ChatCompletionToolChoiceOption, CreateChatCompletionRequest};
 use secrecy::ExposeSecret;
+use serde::Deserialize;
 
 use crate::{
     domain::{
@@ -13,7 +13,6 @@ use crate::{
 pub struct LargeLanguageModel {
     pub config: OpenAIConfig,
     pub client: reqwest::Client,
-    pub model: String,
 }
 
 impl LargeLanguageModel {
@@ -22,18 +21,17 @@ impl LargeLanguageModel {
         messages: Vec<Message>,
         tools: Option<Vec<Tool>>,
     ) -> anyhow::Result<AssistantMessage> {
-        let messages = messages.into_iter().map(|m| m.into()).collect();
-        let tools = tools.map(|tools| tools.into_iter().map(|t| t.into()).collect());
-
-        let request = CreateChatCompletionRequest {
-            model: self.model.clone(),
-            messages,
-            stream: None,
-            tools,
-            tool_choice: Some(ChatCompletionToolChoiceOption::Auto),
-            ..Default::default()
-        };
         let url = self.config.api_base.clone() + "/chat/completions";
+        let messages = get_messages(&messages);
+        let tools = tools.map(|t| get_tools(&t));
+
+        let request = serde_json::json!({
+            "model": self.config.model,
+            "messages": messages,
+            "tools": tools,
+            "tool_choice": "auto",
+        });
+
         let body = serde_json::to_string(&request)?;
         let response = self
             .client
@@ -44,107 +42,100 @@ impl LargeLanguageModel {
             .await?
             .error_for_status()?;
 
-        let response = response.json::<serde_json::Value>().await?;
+        let response = response.json::<Response>().await?;
+        let content = response
+            .choices.first()
+            .ok_or(anyhow::Error::msg("Chat completion had no choices"))?
+            .message
+            .content
+            .clone();
 
-        Ok(response.try_into()?)
-    }
-}
-
-impl TryFrom<serde_json::Value> for AssistantMessage {
-    type Error = JsonParsingError;
-
-    fn try_from(response: serde_json::Value) -> Result<Self, Self::Error> {
-        let choices = response
-            .get("choices")
-            .ok_or(Self::Error::Missing("choices", response.to_string()))?;
-
-        let choice = choices
-            .get(0)
-            .ok_or(Self::Error::Missing("0", choices.to_string()))?;
-
-        let message = choice
-            .get("message")
-            .ok_or(Self::Error::Missing("message", choices.to_string()))?;
-
-        let content = message
-            .get("content")
-            .ok_or(Self::Error::Missing("content", message.to_string()))?;
-
-        let content = content.as_str().ok_or(Self::Error::WrongType(
-            "content",
-            "string",
-            content.to_string(),
-        ))?;
-
-        let tool_calls = match message.get("tool_calls") {
-            Some(tool_calls) => {
-                let tool_calls = tool_calls.as_array().ok_or(Self::Error::WrongType(
-                    "tool_calls",
-                    "array",
-                    tool_calls.to_string(),
-                ))?;
-                let mut tool_calls_vec = Vec::with_capacity(tool_calls.len());
-                for tool_call in tool_calls {
-                    tool_calls_vec.push(tool_call.clone().try_into()?);
-                }
-                tool_calls_vec
-            }
-            None => vec![],
-        };
-
-        Ok(Self {
-            content: content.to_string(),
+        let tool_calls = response
+            .tool_calls
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|tc| {
+                Some(ToolCallMessage {
+                    id: tc.id,
+                    name: tc.function.name,
+                    arguments: serde_json::from_str(&tc.function.arguments)
+                        .inspect_err(|e| log::error!("{}", e))
+                        .ok()?,
+                })
+            })
+            .collect();
+        Ok(AssistantMessage {
+            content,
             tool_calls,
         })
     }
 }
 
-impl TryFrom<serde_json::Value> for ToolCallMessage {
-    type Error = JsonParsingError;
-
-    fn try_from(tool_call: serde_json::Value) -> Result<Self, Self::Error> {
-        let id = tool_call
-            .get("id")
-            .ok_or(Self::Error::Missing("id", tool_call.to_string()))?;
-        let id = id
-            .as_str()
-            .ok_or(Self::Error::WrongType("id", "string", id.to_string()))?;
-
-        let function = tool_call
-            .get("function")
-            .ok_or(Self::Error::Missing("function", tool_call.to_string()))?;
-
-        let name = function
-            .get("name")
-            .ok_or(Self::Error::Missing("name", function.to_string()))?;
-        let name =
-            name.as_str()
-                .ok_or(Self::Error::WrongType("name", "string", name.to_string()))?;
-
-        let arguments = function
-            .get("arguments")
-            .ok_or(Self::Error::Missing("arguments", function.to_string()))?;
-        let arguments = arguments.as_str().ok_or(Self::Error::WrongType(
-            "arguments",
-            "string",
-            arguments.to_string(),
-        ))?;
-        let arguments = serde_json::from_str(arguments)?;
-
-        Ok(Self {
-            id: id.to_owned(),
-            name: name.to_owned(),
-            arguments,
-        })
-    }
+#[derive(Deserialize)]
+struct Response {
+    choices: Vec<Choice>,
+    tool_calls: Option<Vec<ResponseToolCall>>,
 }
 
-#[derive(thiserror::Error, Debug)]
-pub enum JsonParsingError {
-    #[error("Missing required index `{0}` in object `{1}`")]
-    Missing(&'static str, String),
-    #[error("Wrong type for field `{0}`, expected type `{1}`, found value `{2}`")]
-    WrongType(&'static str, &'static str, String),
-    #[error(transparent)]
-    JsonError(#[from] serde_json::Error),
+#[derive(Deserialize)]
+struct Choice {
+    message: ResponseMessage,
+}
+
+#[derive(Deserialize)]
+struct ResponseMessage {
+    content: String,
+}
+
+#[derive(Deserialize)]
+struct ResponseToolCall {
+    id: String,
+    function: Function,
+}
+
+#[derive(Deserialize)]
+struct Function {
+    name: String,
+    arguments: String,
+}
+
+fn get_messages(messages: &[Message]) -> serde_json::Value {
+    messages
+        .iter()
+        .map(|m| match m {
+            Message::System(s) => serde_json::json!({
+                "role": "system",
+                "content": s.content,
+            }),
+            Message::User(u) => serde_json::json!({
+                "role": "user",
+                "content": u.content,
+            }),
+            Message::Assistant(a) => serde_json::json!({
+                "role": "assistant",
+                "content": a.content,
+            }),
+            Message::Tool(t) => serde_json::json!({
+                "role": "tool",
+                "content": t.content,
+                "tool_call_id": t.tool_call_id,
+            }),
+        })
+        .collect()
+}
+
+fn get_tools(tools: &[Tool]) -> serde_json::Value {
+    tools
+        .iter()
+        .map(|t| {
+            serde_json::json!({
+                "type": "function",
+                "function": {
+                    "description": t.description,
+                    "name": t.name,
+                    "parameters": t.parameters
+                }
+            })
+        })
+        .collect()
 }

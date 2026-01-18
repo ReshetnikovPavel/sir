@@ -5,7 +5,6 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.98"
-async-openai = "0.28.1"
 clap = { version = "4.5.48", features = ["derive"] }
 cpal = "0.16.0"
 dotenv = "0.15.0"
@@ -16,7 +15,7 @@ hound = "3.5.1"
 libsql = "0.9.19"
 log = "0.4.27"
 oww-rs = { git = "https://github.com/ReshetnikovPavel/oww_rs", version = "0.2.0" }
-reqwest = "0.12.23"
+reqwest = { version = "0.12.23", features = ["multipart"] }
 rmcp = { version = "0.1.5", features = ["client", "transport-child-process", "transport-sse"] }
 rodio = "0.21.1"
 secrecy = { version = "0.10.3", features = ["serde"] }
