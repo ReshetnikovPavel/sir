@@ -5,10 +5,12 @@ use crate::openai::llm::LargeLanguageModel;
 use crate::rag::tools_rag::ToolsRag;
 use crate::voice_assistant::assistant::VoiceAssistant;
 use crate::{domain::events::Event, text::context_service::ContextService};
+use std::env;
+use std::process::exit;
 use std::sync::Arc;
 use std::{fs::read_to_string, path::PathBuf};
 
-use clap::Parser;
+use anyhow::anyhow;
 use config::Config;
 use dotenv::dotenv;
 use mcp::tools_repo::McpToolsRepo;
@@ -27,13 +29,41 @@ mod text;
 mod tui;
 mod voice_assistant;
 
-/// SIR AI
-#[derive(Parser, Debug)]
-#[command(author, version, about)]
+fn print_help() {
+    println!(
+        "Usage: sir [OPTION]...
+Run AI assistant.
+
+-c, --config config path to use"
+    )
+}
+
 pub struct Args {
-    /// Path to the configuration file
-    #[arg(short, long, default_value = "config.json")]
     pub config: PathBuf,
+}
+
+impl Args {
+    fn parse() -> anyhow::Result<Self> {
+        let mut args = env::args().skip(1);
+        let mut config = PathBuf::from("config.json");
+        while let Some(arg) = args.next() {
+            match arg.as_ref() {
+                "-c" | "--config" => {
+                    config = args
+                        .next()
+                        .ok_or(anyhow!("No config value provided"))?
+                        .into()
+                }
+                "-h" | "--help" => {
+                    print_help();
+                    exit(0)
+                },
+                arg if arg.starts_with('-') => Err(anyhow!("Unknown option: `{}`", arg))?,
+                arg => Err(anyhow!("Positional arguments are not supported: `{}`", arg))?
+            }
+        }
+        Ok(Self { config })
+    }
 }
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 8)]
@@ -41,7 +71,7 @@ async fn main() {
     dotenv().ok();
     env_logger::init();
 
-    let args = Args::parse();
+    let args = Args::parse().expect("Failed to parse arguments");
 
     let (event_sender, event_receiver) = channel(16);
     let config = Config::load(args.config).await;
@@ -79,7 +109,7 @@ async fn main() {
 
     let embedding_model = EmbeddingModel {
         client: reqwest::Client::new(),
-        config: config.chat.embedding.clone()
+        config: config.chat.embedding.clone(),
     };
     let embedding_model = Arc::new(embedding_model);
 
