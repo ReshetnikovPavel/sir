@@ -38,8 +38,8 @@ Run AI assistant.
     )
 }
 
-pub struct Args {
-    pub config: PathBuf,
+struct Args {
+    config: PathBuf,
 }
 
 impl Args {
@@ -48,18 +48,18 @@ impl Args {
         let mut config = PathBuf::from("config.json");
         while let Some(arg) = args.next() {
             match arg.as_ref() {
-                "-c" | "--config" => {
-                    config = args
-                        .next()
-                        .ok_or(anyhow!("No config value provided"))?
-                        .into()
-                }
                 "-h" | "--help" => {
                     print_help();
                     exit(0)
-                },
+                }
+                "-c" | "--config" => {
+                    config = args
+                        .next()
+                        .ok_or(anyhow!("No `{}` value provided", arg))?
+                        .into()
+                }
                 arg if arg.starts_with('-') => Err(anyhow!("Unknown option: `{}`", arg))?,
-                arg => Err(anyhow!("Positional arguments are not supported: `{}`", arg))?
+                arg => Err(anyhow!("Positional arguments are not supported: `{}`", arg))?,
             }
         }
         Ok(Self { config })
@@ -146,6 +146,5 @@ async fn main() {
         event_emitter: event_emitter.clone(),
     };
 
-    log::info!("Starting voice assistant");
     VoiceAssistant::startup(config, text_pipeline, event_emitter).await;
 }
