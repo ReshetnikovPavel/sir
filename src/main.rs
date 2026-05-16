@@ -6,7 +6,7 @@ use crate::rag::tools_rag::ToolsRag;
 use crate::voice_assistant::assistant::VoiceAssistant;
 use crate::{domain::events::Event, text::context_service::ContextService};
 use std::env;
-use std::process::exit;
+use std::process::{Command, exit};
 use std::sync::Arc;
 use std::{fs::read_to_string, path::PathBuf};
 
@@ -75,6 +75,18 @@ async fn main() {
 
     let (event_sender, event_receiver) = channel(16);
     let config = Config::load(args.config).await;
+
+    let procs = config
+        .procs
+        .iter()
+        .map(|p| {
+            Command::new(p.command.clone())
+                .args(p.args.clone())
+                .spawn()
+                .expect("Cound not run a command")
+        })
+        .collect::<Vec<_>>();
+    log::info!("Started {} processes", procs.len());
 
     log::info!("Connecting to the database");
     let db = libsql::Builder::new_local("sir.db")

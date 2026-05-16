@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{path::Path};
 
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Deserializer};
@@ -19,6 +19,16 @@ pub struct Config {
     #[serde(flatten)]
     pub mcp: McpConfig,
     pub context: ContextOptions,
+    #[serde(default)]
+    pub procs: Vec<ProcConfig>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ProcConfig {
+    pub command: String,
+    #[serde(default)]
+    pub args: Vec<String>,
 }
 
 impl Config {
